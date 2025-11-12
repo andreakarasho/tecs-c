@@ -1,0 +1,29 @@
+{
+  "lsp": {
+    "clangd": {
+      "binary": {
+        "path": "clangd",
+        "arguments": [
+          "--background-index",
+          "--clang-tidy",
+          "--completion-style=detailed",
+          "--header-insertion=iwyu",
+          "--pch-storage=memory"
+        ]
+      },
+      "initialization_options": {
+        "compilationDatabasePath": "."
+      }
+    }
+  },
+  "tab_size": 4,
+  "hard_tabs": false,
+  "formatter": {
+    "language_server": {
+      "name": "clangd"
+    }
+  },
+  "code_actions_on_format": {
+    "source.organizeImports": true
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: example.c",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/example.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "C:/mingw32/bin/gdb.exe",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set Disassembly Flavor to Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "Build Debug: example.c"
+    },
+    {
+      "name": "Debug: example_bevy.c",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/example_bevy.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "C:/mingw32/bin/gdb.exe",
+      "preLaunchTask": "Build Debug: example_bevy.c"
+    },
+    {
+      "name": "Debug: example_hierarchy.c",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/example_hierarchy.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "C:/mingw32/bin/gdb.exe",
+      "preLaunchTask": "Build Debug: example_hierarchy.c"
+    },
+    {
+      "name": "Debug: example_bevy_hierarchy.c",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/example_bevy_hierarchy.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "C:/mingw32/bin/gdb.exe",
+      "preLaunchTask": "Build Debug: example_bevy_hierarchy.c"
+    },
+    {
+      "name": "Debug: example_bevy_performance.c",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/example_bevy_performance.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "C:/mingw32/bin/gdb.exe",
+      "preLaunchTask": "Build Debug: example_bevy_performance.c"
+    },
+    {
+      "name": "Debug: example_bevy_raylib_3d.c",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/example_bevy_raylib_3d.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "C:/mingw32/bin/gdb.exe",
+      "preLaunchTask": "Build Debug: example_bevy_raylib_3d.c"
+    }
+  ]
+}

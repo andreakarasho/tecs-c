@@ -1,0 +1,145 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Debug: example.c",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-O0",
+        "-g",
+        "-I.",
+        "-o",
+        "build/example.exe",
+        "examples/example.c"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": ["$gcc"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build Debug: example_bevy.c",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-O0",
+        "-g",
+        "-I.",
+        "-o",
+        "build/example_bevy.exe",
+        "examples/example_bevy.c"
+      ],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Build Debug: example_hierarchy.c",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-O0",
+        "-g",
+        "-I.",
+        "-o",
+        "build/example_hierarchy.exe",
+        "examples/example_hierarchy.c"
+      ],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Build Debug: example_bevy_hierarchy.c",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-O0",
+        "-g",
+        "-I.",
+        "-o",
+        "build/example_bevy_hierarchy.exe",
+        "examples/example_bevy_hierarchy.c"
+      ],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Build Debug: example_bevy_performance.c",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-O0",
+        "-g",
+        "-I.",
+        "-o",
+        "build/example_bevy_performance.exe",
+        "examples/example_bevy_performance.c"
+      ],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Build Debug: example_bevy_raylib_3d.c",
+      "type": "shell",
+      "command": "gcc",
+      "args": [
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-O0",
+        "-g",
+        "-I.",
+        "-I./raylib-5.5_win64_mingw-w64/include",
+        "-o",
+        "build/example_bevy_raylib_3d.exe",
+        "examples/example_bevy_raylib_3d.c",
+        "./raylib-5.5_win64_mingw-w64/lib/libraylib.a",
+        "-lopengl32",
+        "-lgdi32",
+        "-lwinmm"
+      ],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Build All Debug Examples",
+      "type": "shell",
+      "command": "make",
+      "args": ["debug"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Clean Build",
+      "type": "shell",
+      "command": "make",
+      "args": ["clean"],
+      "problemMatcher": []
+    }
+  ]
+}

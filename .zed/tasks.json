@@ -1,0 +1,165 @@
+[
+  {
+    "label": "Build Debug: example.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -o build/example.exe examples/example.c",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build Debug: example_bevy.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -o build/example_bevy.exe examples/example_bevy.c",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build Debug: example_hierarchy.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -o build/example_hierarchy.exe examples/example_hierarchy.c",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build Debug: example_bevy_hierarchy.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -o build/example_bevy_hierarchy.exe examples/example_bevy_hierarchy.c",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build Debug: example_bevy_performance.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -o build/example_bevy_performance.exe examples/example_bevy_performance.c",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build Debug: example_bevy_raylib_3d.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -I./raylib-5.5_win64_mingw-w64/include -o build/example_bevy_raylib_3d.exe examples/example_bevy_raylib_3d.c ./raylib-5.5_win64_mingw-w64/lib/libraylib.a -lopengl32 -lgdi32 -lwinmm",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build Debug: example_iter_cache.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -o build/example_iter_cache.exe examples/example_iter_cache.c",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build Debug: example_iter_library_cache.c",
+    "command": "if (!(Test-Path build)) { New-Item -ItemType Directory -Path build }; gcc -std=c99 -Wall -Wextra -O0 -g -I. -o build/example_iter_library_cache.exe examples/example_iter_library_cache.c",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build All Debug Examples",
+    "command": "make debug",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "tags": ["build"]
+  },
+  {
+    "label": "Build Release Examples",
+    "command": "make release",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "tags": ["build"]
+  },
+  {
+    "label": "Clean Build",
+    "command": "make clean",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Run: example.exe",
+    "command": ".\\build\\example.exe",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    "label": "Run: example_bevy.exe",
+    "command": ".\\build\\example_bevy.exe",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    "label": "Run: example_hierarchy.exe",
+    "command": ".\\build\\example_hierarchy.exe",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    "label": "Run: example_bevy_performance.exe",
+    "command": ".\\build\\example_bevy_performance.exe",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": true,
+    "reveal": "always"
+  },
+  {
+    "label": "Debug with GDB: example",
+    "command": "gdb .\\build\\example.exe",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Debug with GDB: example_bevy",
+    "command": "gdb .\\build\\example_bevy.exe",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Debug with GDB: example_bevy_performance",
+    "command": "gdb .\\build\\example_bevy_performance.exe",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Run Tests",
+    "command": "make run-tests",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "tags": ["test"]
+  },
+  {
+    "label": "Run Performance Benchmark",
+    "command": "make benchmark",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]
