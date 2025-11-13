@@ -413,6 +413,7 @@ struct tecs_archetype_s {
 
     /* Hash maps for O(1) lookups */
     tecs_component_map_t component_map;       /* component_id -> index in components array */
+    tecs_component_map_t data_component_map;  /* component_id -> column index (data components only) */
     tecs_edge_map_t add_edge_map;             /* component_id -> target archetype */
     tecs_edge_map_t remove_edge_map;          /* component_id -> target archetype */
 };
@@ -843,12 +844,23 @@ static tecs_archetype_t* tecs_archetype_new(const tecs_component_info_t* compone
     if (map_capacity < 8) map_capacity = 8;
 
     tecs_component_map_init(&arch->component_map, map_capacity);
+    
+    /* Initialize data component map for O(1) column lookups */
+    int data_map_capacity = arch->data_component_count * 2;
+    if (data_map_capacity < 8) data_map_capacity = 8;
+    tecs_component_map_init(&arch->data_component_map, data_map_capacity);
+    
     tecs_edge_map_init(&arch->add_edge_map, 16);
     tecs_edge_map_init(&arch->remove_edge_map, 16);
 
     /* Populate component map */
     for (int i = 0; i < component_count; i++) {
         tecs_component_map_set(&arch->component_map, arch->components[i].id, i);
+    }
+    
+    /* Populate data component map (component_id -> column index) */
+    for (int i = 0; i < arch->data_component_count; i++) {
+        tecs_component_map_set(&arch->data_component_map, arch->data_components[i].id, i);
     }
 
     return arch;
@@ -877,6 +889,7 @@ static void tecs_archetype_free(tecs_archetype_t* arch) {
 
     /* Free hash maps */
     tecs_component_map_free(&arch->component_map);
+    tecs_component_map_free(&arch->data_component_map);
     tecs_edge_map_free(&arch->add_edge_map);
     tecs_edge_map_free(&arch->remove_edge_map);
 
@@ -1023,9 +1036,13 @@ tecs_world_t* tecs_world_new(void) {
     world->archetype_table_capacity = TECS_INITIAL_ARCHETYPES;
     world->archetype_table = TECS_CALLOC(world->archetype_table_capacity,
                                          sizeof(tecs_archetype_table_entry_t));
+    world->archetype_table_size = 0;
+    
+    /* Insert root archetype using hash table logic */
+    size_t index = world->root_archetype->id % world->archetype_table_capacity;
+    world->archetype_table[index].hash = world->root_archetype->id;
+    world->archetype_table[index].archetype = world->root_archetype;
     world->archetype_table_size = 1;
-    world->archetype_table[0].hash = world->root_archetype->id;
-    world->archetype_table[0].archetype = world->root_archetype;
 
     /* Initialize component registry */
     world->component_capacity = TECS_MAX_COMPONENTS;
@@ -1058,8 +1075,8 @@ tecs_world_t* tecs_world_new(void) {
 void tecs_world_free(tecs_world_t* world) {
     if (!world) return;
 
-    /* Free all archetypes */
-    for (int i = 0; i < world->archetype_table_size; i++) {
+    /* Free all archetypes - iterate through hash table capacity */
+    for (int i = 0; i < world->archetype_table_capacity; i++) {
         if (world->archetype_table[i].archetype) {
             tecs_archetype_free(world->archetype_table[i].archetype);
         }
@@ -1109,14 +1126,16 @@ void tecs_world_clear(tecs_world_t* world) {
     world->tick = 0;
     world->structural_change_version++;
 
-    /* Clear all archetypes except root */
-    for (int i = 1; i < world->archetype_table_size; i++) {
-        if (world->archetype_table[i].archetype) {
+    /* Clear all archetypes except root - iterate through hash table capacity */
+    for (int i = 0; i < world->archetype_table_capacity; i++) {
+        if (world->archetype_table[i].archetype && 
+            world->archetype_table[i].archetype != world->root_archetype) {
             tecs_archetype_free(world->archetype_table[i].archetype);
             world->archetype_table[i].archetype = NULL;
+            world->archetype_table[i].hash = 0;
         }
     }
-    world->archetype_table_size = 1;
+    world->archetype_table_size = 1;  /* Only root remains */
 
     /* Clear root archetype chunks */
     for (int i = 0; i < world->root_archetype->chunk_count; i++) {
@@ -1167,24 +1186,61 @@ tecs_component_id_t tecs_get_component_id(const tecs_world_t* world, const char*
  * ========================================================================= */
 
 static tecs_archetype_t* tecs_world_find_archetype(const tecs_world_t* world, uint64_t hash) {
-    for (int i = 0; i < world->archetype_table_size; i++) {
-        if (world->archetype_table[i].hash == hash) {
-            return world->archetype_table[i].archetype;
+    if (world->archetype_table_capacity == 0) return NULL;
+    
+    /* O(1) hash table lookup with linear probing */
+    size_t index = hash % world->archetype_table_capacity;
+    size_t start = index;
+    
+    do {
+        if (world->archetype_table[index].archetype == NULL) {
+            return NULL;  /* Empty slot, archetype doesn't exist */
         }
-    }
-    return NULL;
+        if (world->archetype_table[index].hash == hash) {
+            return world->archetype_table[index].archetype;
+        }
+        index = (index + 1) % world->archetype_table_capacity;
+    } while (index != start);
+    
+    return NULL;  /* Table is full and archetype not found */
 }
 
 static void tecs_world_add_archetype(tecs_world_t* world, tecs_archetype_t* arch) {
-    if (world->archetype_table_size >= world->archetype_table_capacity) {
-        world->archetype_table_capacity *= 2;
-        world->archetype_table = TECS_REALLOC(world->archetype_table,
-                                              world->archetype_table_capacity *
-                                              sizeof(tecs_archetype_table_entry_t));
+    /* Rehash if load factor exceeds 0.7 */
+    if (world->archetype_table_size >= (world->archetype_table_capacity * 7) / 10) {
+        int old_capacity = world->archetype_table_capacity;
+        int new_capacity = old_capacity * 2;
+        tecs_archetype_table_entry_t* old_table = world->archetype_table;
+        
+        /* Allocate new table and zero-initialize */
+        world->archetype_table = TECS_CALLOC(new_capacity, sizeof(tecs_archetype_table_entry_t));
+        world->archetype_table_capacity = new_capacity;
+        world->archetype_table_size = 0;
+        
+        /* Rehash all existing entries */
+        for (int i = 0; i < old_capacity; i++) {
+            if (old_table[i].archetype != NULL) {
+                /* Insert into new table with linear probing */
+                size_t index = old_table[i].hash % new_capacity;
+                while (world->archetype_table[index].archetype != NULL) {
+                    index = (index + 1) % new_capacity;
+                }
+                world->archetype_table[index] = old_table[i];
+                world->archetype_table_size++;
+            }
+        }
+        
+        TECS_FREE(old_table);
     }
-
-    world->archetype_table[world->archetype_table_size].hash = arch->id;
-    world->archetype_table[world->archetype_table_size].archetype = arch;
+    
+    /* Insert new archetype with linear probing */
+    size_t index = arch->id % world->archetype_table_capacity;
+    while (world->archetype_table[index].archetype != NULL) {
+        index = (index + 1) % world->archetype_table_capacity;
+    }
+    
+    world->archetype_table[index].hash = arch->id;
+    world->archetype_table[index].archetype = arch;
     world->archetype_table_size++;
     world->structural_change_version++;
 }
@@ -1323,31 +1379,28 @@ static tecs_archetype_t* tecs_world_get_or_create_archetype_without_component(
 
 static void tecs_copy_component_data(tecs_archetype_t* src_arch, tecs_chunk_t* src_chunk, int src_row,
                                      tecs_archetype_t* dst_arch, tecs_chunk_t* dst_chunk, int dst_row) {
-    /* Copy matching components from source to destination */
+    /* Copy matching components from source to destination - O(n) with hashmap */
     for (int i = 0; i < src_arch->data_component_count; i++) {
         tecs_component_id_t comp_id = src_arch->data_components[i].id;
 
-        /* Find matching component in destination */
-        for (int j = 0; j < dst_arch->data_component_count; j++) {
-            if (dst_arch->data_components[j].id == comp_id) {
-                int src_size = src_arch->data_components[i].size;
-                int dst_size = dst_arch->data_components[j].size;
-                assert(src_size == dst_size);
+        /* O(1) hashmap lookup instead of O(n) inner loop */
+        int dst_column_idx = tecs_component_map_get(&dst_arch->data_component_map, comp_id);
+        if (dst_column_idx < 0) continue;  /* Component not in destination archetype */
 
-                /* Copy data */
-                memcpy((char*)dst_chunk->columns[j].data + dst_row * dst_size,
-                       (char*)src_chunk->columns[i].data + src_row * src_size,
-                       src_size);
+        int src_size = src_arch->data_components[i].size;
+        int dst_size = dst_arch->data_components[dst_column_idx].size;
+        assert(src_size == dst_size);
 
-                /* Copy ticks */
-                dst_chunk->columns[j].changed_ticks[dst_row] =
-                    src_chunk->columns[i].changed_ticks[src_row];
-                dst_chunk->columns[j].added_ticks[dst_row] =
-                    src_chunk->columns[i].added_ticks[src_row];
+        /* Copy data */
+        memcpy((char*)dst_chunk->columns[dst_column_idx].data + dst_row * dst_size,
+               (char*)src_chunk->columns[i].data + src_row * src_size,
+               src_size);
 
-                break;
-            }
-        }
+        /* Copy ticks */
+        dst_chunk->columns[dst_column_idx].changed_ticks[dst_row] =
+            src_chunk->columns[i].changed_ticks[src_row];
+        dst_chunk->columns[dst_column_idx].added_ticks[dst_row] =
+            src_chunk->columns[i].added_ticks[src_row];
     }
 }
 
@@ -1361,20 +1414,19 @@ void tecs_set(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t com
     /* Check if component already exists */
     int comp_idx = tecs_archetype_find_component(current_arch, component_id);
     if (comp_idx >= 0) {
-        /* Update existing component */
+        /* Update existing component - O(1) hashmap lookup */
+        int column_idx = tecs_component_map_get(&current_arch->data_component_map, component_id);
+        if (column_idx < 0) {
+            return;  /* Tag component, no data to update */
+        }
+        
         int chunk_idx = record->chunk_index;
         int row = record->row % TECS_CHUNK_SIZE;
         tecs_chunk_t* chunk = current_arch->chunks[chunk_idx];
-
-        /* Find data component index */
-        for (int i = 0; i < current_arch->data_component_count; i++) {
-            if (current_arch->data_components[i].id == component_id) {
-                memcpy((char*)chunk->columns[i].data + row * size, data, size);
-                chunk->columns[i].changed_ticks[row] = world->tick;
-                return;
-            }
-        }
-        return;  /* Tag component, no data to update */
+        
+        memcpy((char*)chunk->columns[column_idx].data + row * size, data, size);
+        chunk->columns[column_idx].changed_ticks[row] = world->tick;
+        return;
     }
 
     /* Need to add component (archetype transition) */
@@ -1400,14 +1452,12 @@ void tecs_set(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t com
     tecs_copy_component_data(current_arch, old_chunk, old_row,
                             new_arch, new_chunk, new_row);
 
-    /* Set new component data */
-    for (int i = 0; i < new_arch->data_component_count; i++) {
-        if (new_arch->data_components[i].id == component_id) {
-            memcpy((char*)new_chunk->columns[i].data + new_row * size, data, size);
-            new_chunk->columns[i].changed_ticks[new_row] = world->tick;
-            new_chunk->columns[i].added_ticks[new_row] = world->tick;
-            break;
-        }
+    /* Set new component data - O(1) hashmap lookup */
+    int new_column_idx = tecs_component_map_get(&new_arch->data_component_map, component_id);
+    if (new_column_idx >= 0) {
+        memcpy((char*)new_chunk->columns[new_column_idx].data + new_row * size, data, size);
+        new_chunk->columns[new_column_idx].changed_ticks[new_row] = world->tick;
+        new_chunk->columns[new_column_idx].added_ticks[new_row] = world->tick;
     }
 
     /* Remove from old archetype */
@@ -1420,17 +1470,14 @@ void* tecs_get(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t co
 
     tecs_archetype_t* arch = record->archetype;
 
-    /* Find component */
-    for (int i = 0; i < arch->data_component_count; i++) {
-        if (arch->data_components[i].id == component_id) {
-            int chunk_idx = record->chunk_index;
-            int row = record->row % TECS_CHUNK_SIZE;
-            tecs_chunk_t* chunk = arch->chunks[chunk_idx];
-            return (char*)chunk->columns[i].data + row * arch->data_components[i].size;
-        }
-    }
+    /* O(1) hashmap lookup instead of O(n) linear search */
+    int column_idx = tecs_component_map_get(&arch->data_component_map, component_id);
+    if (column_idx < 0) return NULL;  /* Component not found or is a tag */
 
-    return NULL;
+    int chunk_idx = record->chunk_index;
+    int row = record->row % TECS_CHUNK_SIZE;
+    tecs_chunk_t* chunk = arch->chunks[chunk_idx];
+    return (char*)chunk->columns[column_idx].data + row * arch->data_components[column_idx].size;
 }
 
 const void* tecs_get_const(const tecs_world_t* world, tecs_entity_t entity,
@@ -1490,16 +1537,15 @@ void tecs_mark_changed(tecs_world_t* world, tecs_entity_t entity,
     if (!record || !record->archetype) return;
 
     tecs_archetype_t* arch = record->archetype;
+    
+    /* O(1) hashmap lookup instead of O(n) linear search */
+    int column_idx = tecs_component_map_get(&arch->data_component_map, component_id);
+    if (column_idx < 0) return;  /* Component not found or is a tag */
+    
     int chunk_idx = record->chunk_index;
     int row = record->row % TECS_CHUNK_SIZE;
-
-    for (int i = 0; i < arch->data_component_count; i++) {
-        if (arch->data_components[i].id == component_id) {
-            tecs_chunk_t* chunk = arch->chunks[chunk_idx];
-            chunk->columns[i].changed_ticks[row] = world->tick;
-            return;
-        }
-    }
+    tecs_chunk_t* chunk = arch->chunks[chunk_idx];
+    chunk->columns[column_idx].changed_ticks[row] = world->tick;
 }
 
 /* ============================================================================
@@ -1579,8 +1625,8 @@ static bool tecs_archetype_matches_query(const tecs_archetype_t* arch, const tec
 void tecs_query_build(tecs_query_t* query) {
     query->matched_count = 0;
 
-    /* Match against all archetypes */
-    for (int i = 0; i < query->world->archetype_table_size; i++) {
+    /* Match against all archetypes - iterate through hash table capacity */
+    for (int i = 0; i < query->world->archetype_table_capacity; i++) {
         tecs_archetype_t* arch = query->world->archetype_table[i].archetype;
         if (arch && tecs_archetype_matches_query(arch, query)) {
             if (query->matched_count >= query->matched_capacity) {
@@ -1725,11 +1771,14 @@ void tecs_end_deferred(tecs_world_t* world) {
 int tecs_remove_empty_archetypes(tecs_world_t* world) {
     int removed = 0;
 
-    for (int i = 1; i < world->archetype_table_size; i++) {
+    /* Iterate through hash table capacity */
+    for (int i = 0; i < world->archetype_table_capacity; i++) {
         tecs_archetype_t* arch = world->archetype_table[i].archetype;
-        if (arch && arch->entity_count == 0) {
+        if (arch && arch->entity_count == 0 && arch != world->root_archetype) {
             tecs_archetype_free(arch);
             world->archetype_table[i].archetype = NULL;
+            world->archetype_table[i].hash = 0;
+            world->archetype_table_size--;
             removed++;
         }
     }

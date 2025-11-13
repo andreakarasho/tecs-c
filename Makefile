@@ -45,7 +45,7 @@ LIB_BEVY = $(BUILD_DIR)/libtinyecs_bevy.a
 # Targets
 EXAMPLES = $(BUILD_DIR)/example.exe $(BUILD_DIR)/example_bevy.exe $(BUILD_DIR)/example_performance.exe $(BUILD_DIR)/example_performance_opt.exe $(BUILD_DIR)/example_bevy_performance.exe $(BUILD_DIR)/example_iter_cache.exe $(BUILD_DIR)/example_iter_library_cache.exe
 
-TESTS = $(BUILD_DIR)/test_bevy_query.exe $(BUILD_DIR)/test_bevy_update.exe $(BUILD_DIR)/test_hierarchy_debug.exe $(BUILD_DIR)/test_ids.exe
+TESTS = $(BUILD_DIR)/test_bevy_query.exe $(BUILD_DIR)/test_bevy_update.exe $(BUILD_DIR)/test_hierarchy.exe $(BUILD_DIR)/test_ids.exe
 
 .PHONY: all clean debug release benchmark dll static test run-tests
 
@@ -93,7 +93,7 @@ $(BUILD_DIR)/test_bevy_query.exe: tests/test_bevy_query.c $(HEADERS) | $(BUILD_D
 $(BUILD_DIR)/test_bevy_update.exe: tests/test_bevy_update.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -I. -o $@ $<
 
-$(BUILD_DIR)/test_hierarchy_debug.exe: tests/test_hierarchy_debug.c $(HEADERS) | $(BUILD_DIR)
+$(BUILD_DIR)/test_hierarchy.exe: tests/test_hierarchy_debug.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -I. -o $@ $<
 
 $(BUILD_DIR)/test_ids.exe: tests/test_ids.c $(HEADERS) | $(BUILD_DIR)
@@ -112,8 +112,8 @@ run-tests: $(TESTS)
 	@echo Running build/test_bevy_update.exe...
 	@./build/test_bevy_update.exe
 	@echo ""
-	@echo Running build/test_hierarchy_debug.exe...
-	@./build/test_hierarchy_debug.exe
+	@echo Running build/test_hierarchy.exe...
+	@./build/test_hierarchy.exe
 	@echo ""
 	@echo Running build/test_ids.exe...
 	@./build/test_ids.exe
