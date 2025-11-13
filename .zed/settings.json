@@ -1,5 +1,16 @@
 {
   "lsp": {
+    "dotrush": {
+        "settings": {
+            "dotrush": {
+                "roslyn": {
+                    // Paths to project or solution files to load
+                    "projectOrSolutionFiles": ["dotnet-bindings/TinyEcsBindings/TinyEcsBindings.csproj"],
+                    "compilerDiagnosticsScope": "Project"
+                }
+            }
+        }
+    },
     "clangd": {
       "binary": {
         "path": "clangd",
