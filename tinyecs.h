@@ -116,6 +116,43 @@ typedef struct tecs_world_s tecs_world_t;
 typedef struct tecs_query_s tecs_query_t;
 typedef struct tecs_query_iter_s tecs_query_iter_t;
 typedef struct tecs_archetype_s tecs_archetype_t;
+typedef struct tecs_storage_provider_s tecs_storage_provider_t;
+
+/* ============================================================================
+ * Pluggable Storage Provider Interface
+ * ========================================================================= */
+
+/* Storage provider operations - allows custom storage backends (e.g., managed C# arrays) */
+struct tecs_storage_provider_s {
+    /* Allocate storage for a chunk (TECS_CHUNK_SIZE entities) */
+    void* (*alloc_chunk)(void* user_data, int component_size, int chunk_capacity);
+    
+    /* Free chunk storage */
+    void (*free_chunk)(void* user_data, void* chunk_data);
+    
+    /* Get pointer to component at index */
+    void* (*get_ptr)(void* user_data, void* chunk_data, int index, int component_size);
+    
+    /* Set component data at index */
+    void (*set_data)(void* user_data, void* chunk_data, int index, 
+                     const void* data, int component_size);
+    
+    /* Copy component from src[src_idx] to dst[dst_idx] */
+    void (*copy_data)(void* user_data, 
+                      void* src_chunk, int src_idx,
+                      void* dst_chunk, int dst_idx,
+                      int component_size);
+    
+    /* Swap components at two indices (for entity removal optimization) */
+    void (*swap_data)(void* user_data, void* chunk_data, 
+                      int idx_a, int idx_b, int component_size);
+    
+    /* User-provided context data */
+    void* user_data;
+    
+    /* Storage provider name (for debugging) */
+    const char* name;
+};
 
 /* Entity ID manipulation macros */
 #define TECS_ENTITY_INDEX(e)      ((uint32_t)((e) & 0xFFFFFFFFULL))
@@ -160,7 +197,10 @@ TECS_API void tecs_world_clear(tecs_world_t* world);
 
 /* Component Registration */
 TECS_API tecs_component_id_t tecs_register_component(tecs_world_t* world, const char* name, int size);
+TECS_API tecs_component_id_t tecs_register_component_ex(tecs_world_t* world, const char* name, int size, 
+                                                         tecs_storage_provider_t* storage_provider);
 TECS_API tecs_component_id_t tecs_get_component_id(const tecs_world_t* world, const char* name);
+TECS_API tecs_storage_provider_t* tecs_get_default_storage_provider(void);
 
 /* Entity Operations */
 TECS_API tecs_entity_t tecs_entity_new(tecs_world_t* world);
@@ -231,6 +271,8 @@ TECS_API void tecs_query_iter_free(tecs_query_iter_t* iter);
 TECS_API int tecs_iter_count(const tecs_query_iter_t* iter);
 TECS_API tecs_entity_t* tecs_iter_entities(const tecs_query_iter_t* iter);
 TECS_API void* tecs_iter_column(const tecs_query_iter_t* iter, int index);
+TECS_API void* tecs_iter_get_at(const tecs_query_iter_t* iter, int column_index, int row_index);
+TECS_API tecs_storage_provider_t* tecs_iter_storage_provider(const tecs_query_iter_t* iter, int index);
 TECS_API tecs_tick_t* tecs_iter_changed_ticks(const tecs_query_iter_t* iter, int index);
 TECS_API tecs_tick_t* tecs_iter_added_ticks(const tecs_query_iter_t* iter, int index);
 
@@ -339,14 +381,102 @@ TECS_API int tecs_remove_empty_archetypes(tecs_world_t* world);
 #endif
 
 /* ============================================================================
+ * Default Native Storage Provider
+ * ========================================================================= */
+
+/* Native storage wrapper */
+typedef struct {
+    void* data;  /* Raw memory block */
+} tecs_native_storage_t;
+
+static void* tecs_native_alloc_chunk(void* user_data, int component_size, int capacity) {
+    (void)user_data;
+    tecs_native_storage_t* storage = TECS_MALLOC(sizeof(tecs_native_storage_t));
+    storage->data = TECS_MALLOC(component_size * capacity);
+    return storage;
+}
+
+static void tecs_native_free_chunk(void* user_data, void* chunk_data) {
+    (void)user_data;
+    if (!chunk_data) return;
+    tecs_native_storage_t* storage = (tecs_native_storage_t*)chunk_data;
+    TECS_FREE(storage->data);
+    TECS_FREE(storage);
+}
+
+static void* tecs_native_get_ptr(void* user_data, void* chunk_data, int index, int size) {
+    (void)user_data;
+    tecs_native_storage_t* storage = (tecs_native_storage_t*)chunk_data;
+    return (char*)storage->data + (index * size);
+}
+
+static void tecs_native_set_data(void* user_data, void* chunk_data, int index,
+                                 const void* data, int size) {
+    void* ptr = tecs_native_get_ptr(user_data, chunk_data, index, size);
+    memcpy(ptr, data, size);
+}
+
+static void tecs_native_copy_data(void* user_data,
+                                   void* src_chunk, int src_idx,
+                                   void* dst_chunk, int dst_idx,
+                                   int size) {
+    void* src_ptr = tecs_native_get_ptr(user_data, src_chunk, src_idx, size);
+    void* dst_ptr = tecs_native_get_ptr(user_data, dst_chunk, dst_idx, size);
+    memcpy(dst_ptr, src_ptr, size);
+}
+
+static void tecs_native_swap_data(void* user_data, void* chunk_data,
+                                   int idx_a, int idx_b, int size) {
+    if (idx_a == idx_b) return;
+    
+    void* ptr_a = tecs_native_get_ptr(user_data, chunk_data, idx_a, size);
+    void* ptr_b = tecs_native_get_ptr(user_data, chunk_data, idx_b, size);
+    
+    /* Swap using temporary buffer on stack (assuming reasonable component sizes) */
+    char temp[256];
+    char* heap_temp = NULL;
+    void* swap_temp = temp;
+    
+    if (size > 256) {
+        heap_temp = TECS_MALLOC(size);
+        swap_temp = heap_temp;
+    }
+    
+    memcpy(swap_temp, ptr_a, size);
+    memcpy(ptr_a, ptr_b, size);
+    memcpy(ptr_b, swap_temp, size);
+    
+    if (heap_temp) {
+        TECS_FREE(heap_temp);
+    }
+}
+
+static tecs_storage_provider_t tecs_default_storage = {
+    .alloc_chunk = tecs_native_alloc_chunk,
+    .free_chunk = tecs_native_free_chunk,
+    .get_ptr = tecs_native_get_ptr,
+    .set_data = tecs_native_set_data,
+    .copy_data = tecs_native_copy_data,
+    .swap_data = tecs_native_swap_data,
+    .user_data = NULL,
+    .name = "native"
+};
+
+tecs_storage_provider_t* tecs_get_default_storage_provider(void) {
+    return &tecs_default_storage;
+}
+
+/* ============================================================================
  * Internal Data Structures
  * ========================================================================= */
 
 /* Component column data within a chunk */
 typedef struct {
-    void* data;                /* Array of component values (size * TECS_CHUNK_SIZE) */
-    tecs_tick_t* changed_ticks; /* Per-entity change ticks */
-    tecs_tick_t* added_ticks;   /* Per-entity added ticks */
+    void* storage_data;             /* Storage-specific data (opaque pointer) */
+    tecs_storage_provider_t* provider; /* Storage provider for this column */
+    bool is_native_storage;         /* Fast path optimization flag */
+    tecs_tick_t* changed_ticks;     /* Per-entity change ticks */
+    tecs_tick_t* added_ticks;       /* Per-entity added ticks */
 } tecs_column_t;
 
 /* Archetype chunk: stores up to TECS_CHUNK_SIZE entities */
@@ -460,6 +590,7 @@ typedef struct {
     tecs_component_id_t id;
     char name[64];
     int size;
+    tecs_storage_provider_t* storage_provider;  /* NULL = use default native storage */
 } tecs_component_registry_entry_t;
 
 /* Archetype hash table entry */
@@ -480,6 +611,7 @@ struct tecs_world_s {
     tecs_component_registry_entry_t* component_registry;
     int component_count;
     int component_capacity;
+    tecs_component_map_t component_registry_map;  /* component_id -> registry index for O(1) lookup */
 
     tecs_tick_t tick;
     uint64_t structural_change_version;
@@ -868,7 +1000,13 @@ static tecs_archetype_t* tecs_archetype_new(const tecs_component_info_t* compone
 
 static void tecs_chunk_free(tecs_chunk_t* chunk, int column_count) {
     for (int i = 0; i < column_count; i++) {
-        TECS_FREE(chunk->columns[i].data);
+        /* Free storage using provider */
+        if (chunk->columns[i].provider && chunk->columns[i].provider->free_chunk) {
+            chunk->columns[i].provider->free_chunk(
+                chunk->columns[i].provider->user_data,
+                chunk->columns[i].storage_data
+            );
+        }
         TECS_FREE(chunk->columns[i].changed_ticks);
         TECS_FREE(chunk->columns[i].added_ticks);
     }
@@ -896,7 +1034,8 @@ static void tecs_archetype_free(tecs_archetype_t* arch) {
     TECS_FREE(arch);
 }
 
-static tecs_chunk_t* tecs_chunk_new(int data_component_count,
+static tecs_chunk_t* tecs_chunk_new(tecs_world_t* world,
+                                     int data_component_count,
                                      const tecs_component_info_t* data_components) {
     tecs_chunk_t* chunk = TECS_MALLOC(sizeof(tecs_chunk_t));
     chunk->count = 0;
@@ -904,7 +1043,28 @@ static tecs_chunk_t* tecs_chunk_new(int data_component_count,
     chunk->columns = TECS_MALLOC(data_component_count * sizeof(tecs_column_t));
 
     for (int i = 0; i < data_component_count; i++) {
-        chunk->columns[i].data = TECS_MALLOC(data_components[i].size * TECS_CHUNK_SIZE);
+        tecs_component_id_t comp_id = data_components[i].id;
+        
+        /* Find storage provider for this component - O(1) lookup */
+        tecs_storage_provider_t* provider = NULL;
+        int registry_index = tecs_component_map_get(&world->component_registry_map, comp_id);
+        if (registry_index >= 0) {
+            provider = world->component_registry[registry_index].storage_provider;
+        }
+        
+        /* Use default storage if none specified */
+        if (!provider) {
+            provider = &tecs_default_storage;
+        }
+        
+        /* Allocate storage using provider */
+        chunk->columns[i].storage_data = provider->alloc_chunk(
+            provider->user_data,
+            data_components[i].size,
+            TECS_CHUNK_SIZE
+        );
+        chunk->columns[i].provider = provider;
+        chunk->columns[i].is_native_storage = (provider == &tecs_default_storage);
         chunk->columns[i].changed_ticks = TECS_CALLOC(TECS_CHUNK_SIZE, sizeof(tecs_tick_t));
         chunk->columns[i].added_ticks = TECS_CALLOC(TECS_CHUNK_SIZE, sizeof(tecs_tick_t));
     }
@@ -912,7 +1072,7 @@ static tecs_chunk_t* tecs_chunk_new(int data_component_count,
     return chunk;
 }
 
-static void tecs_archetype_add_entity(tecs_archetype_t* arch, tecs_entity_t entity,
+static void tecs_archetype_add_entity(tecs_world_t* world, tecs_archetype_t* arch, tecs_entity_t entity,
                                       tecs_entity_record_t* record, tecs_tick_t tick) {
     /* Find or create chunk with space */
     tecs_chunk_t* chunk = NULL;
@@ -934,7 +1094,7 @@ static void tecs_archetype_add_entity(tecs_archetype_t* arch, tecs_entity_t enti
                                         arch->chunk_capacity * sizeof(tecs_chunk_t*));
         }
 
-        chunk = tecs_chunk_new(arch->data_component_count, arch->data_components);
+        chunk = tecs_chunk_new(world, arch->data_component_count, arch->data_components);
         arch->chunks[arch->chunk_count] = chunk;
         chunk_idx = arch->chunk_count;
         arch->chunk_count++;
@@ -966,14 +1126,35 @@ static void tecs_archetype_remove_entity(tecs_archetype_t* arch, int chunk_idx, 
     if (row != last_row) {
         chunk->entities[row] = chunk->entities[last_row];
 
-        /* Copy component data */
+        /* Swap component data using storage provider */
         for (int i = 0; i < arch->data_component_count; i++) {
+            tecs_column_t* column = &chunk->columns[i];
             int size = arch->data_components[i].size;
-            memcpy((char*)chunk->columns[i].data + row * size,
-                   (char*)chunk->columns[i].data + last_row * size,
-                   size);
-            chunk->columns[i].changed_ticks[row] = chunk->columns[i].changed_ticks[last_row];
-            chunk->columns[i].added_ticks[row] = chunk->columns[i].added_ticks[last_row];
+            
+            /* Use provider's swap or copy operation */
+            if (column->provider->swap_data) {
+                /* Optimized swap if available */
+                column->provider->swap_data(
+                    column->provider->user_data,
+                    column->storage_data,
+                    row,
+                    last_row,
+                    size
+                );
+            } else {
+                /* Fallback to copy */
+                column->provider->copy_data(
+                    column->provider->user_data,
+                    column->storage_data,
+                    last_row,
+                    column->storage_data,
+                    row,
+                    size
+                );
+            }
+            
+            column->changed_ticks[row] = column->changed_ticks[last_row];
+            column->added_ticks[row] = column->added_ticks[last_row];
         }
     }
 
@@ -1049,6 +1230,7 @@ tecs_world_t* tecs_world_new(void) {
     world->component_registry = TECS_MALLOC(world->component_capacity *
                                             sizeof(tecs_component_registry_entry_t));
     world->component_count = 0;
+    tecs_component_map_init(&world->component_registry_map, TECS_MAX_COMPONENTS);
 
     /* Initialize deferred command buffer */
     world->command_capacity = 256;
@@ -1084,6 +1266,7 @@ void tecs_world_free(tecs_world_t* world) {
 
     TECS_FREE(world->archetype_table);
     TECS_FREE(world->component_registry);
+    tecs_component_map_free(&world->component_registry_map);
 
     /* Free command buffer */
     for (int i = 0; i < world->command_count; i++) {
@@ -1148,7 +1331,8 @@ void tecs_world_clear(tecs_world_t* world) {
  * Component Registration
  * ========================================================================= */
 
-tecs_component_id_t tecs_register_component(tecs_world_t* world, const char* name, int size) {
+tecs_component_id_t tecs_register_component_ex(tecs_world_t* world, const char* name, int size,
+                                                tecs_storage_provider_t* storage_provider) {
     if (world->component_count >= world->component_capacity) {
         world->component_capacity *= 2;
         world->component_registry = TECS_REALLOC(world->component_registry,
@@ -1158,13 +1342,22 @@ tecs_component_id_t tecs_register_component(tecs_world_t* world, const char* nam
 
     tecs_component_id_t id = world->component_count + 1;  /* Start at 1, 0 is reserved */
 
-    world->component_registry[world->component_count].id = id;
-    strncpy(world->component_registry[world->component_count].name, name, 63);
-    world->component_registry[world->component_count].name[63] = '\0';
-    world->component_registry[world->component_count].size = size;
+    int registry_index = world->component_count;
+    world->component_registry[registry_index].id = id;
+    strncpy(world->component_registry[registry_index].name, name, 63);
+    world->component_registry[registry_index].name[63] = '\0';
+    world->component_registry[registry_index].size = size;
+    world->component_registry[registry_index].storage_provider = storage_provider;
     world->component_count++;
+    
+    /* Add to hashmap for O(1) lookup */
+    tecs_component_map_set(&world->component_registry_map, id, registry_index);
 
     return id;
+}
+
+tecs_component_id_t tecs_register_component(tecs_world_t* world, const char* name, int size) {
+    return tecs_register_component_ex(world, name, size, NULL);
 }
 
 tecs_component_id_t tecs_get_component_id(const tecs_world_t* world, const char* name) {
@@ -1254,7 +1447,7 @@ tecs_entity_t tecs_entity_new(tecs_world_t* world) {
     tecs_entity_record_t* record = tecs_sparse_set_get(&world->entities, entity);
 
     /* Add to root archetype */
-    tecs_archetype_add_entity(world->root_archetype, entity, record, world->tick);
+    tecs_archetype_add_entity(world, world->root_archetype, entity, record, world->tick);
 
     return entity;
 }
@@ -1391,16 +1584,22 @@ static void tecs_copy_component_data(tecs_archetype_t* src_arch, tecs_chunk_t* s
         int dst_size = dst_arch->data_components[dst_column_idx].size;
         assert(src_size == dst_size);
 
-        /* Copy data */
-        memcpy((char*)dst_chunk->columns[dst_column_idx].data + dst_row * dst_size,
-               (char*)src_chunk->columns[i].data + src_row * src_size,
-               src_size);
+        /* Use storage provider copy_data API */
+        tecs_column_t* src_column = &src_chunk->columns[i];
+        tecs_column_t* dst_column = &dst_chunk->columns[dst_column_idx];
+        
+        dst_column->provider->copy_data(
+            dst_column->provider->user_data,
+            src_column->storage_data,
+            src_row,
+            dst_column->storage_data,
+            dst_row,
+            src_size
+        );
 
         /* Copy ticks */
-        dst_chunk->columns[dst_column_idx].changed_ticks[dst_row] =
-            src_chunk->columns[i].changed_ticks[src_row];
-        dst_chunk->columns[dst_column_idx].added_ticks[dst_row] =
-            src_chunk->columns[i].added_ticks[src_row];
+        dst_column->changed_ticks[dst_row] = src_column->changed_ticks[src_row];
+        dst_column->added_ticks[dst_row] = src_column->added_ticks[src_row];
     }
 }
 
@@ -1423,9 +1622,17 @@ void tecs_set(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t com
         int chunk_idx = record->chunk_index;
         int row = record->row % TECS_CHUNK_SIZE;
         tecs_chunk_t* chunk = current_arch->chunks[chunk_idx];
+        tecs_column_t* column = &chunk->columns[column_idx];
         
-        memcpy((char*)chunk->columns[column_idx].data + row * size, data, size);
-        chunk->columns[column_idx].changed_ticks[row] = world->tick;
+        /* Use storage provider API */
+        column->provider->set_data(
+            column->provider->user_data,
+            column->storage_data,
+            row,
+            data,
+            size
+        );
+        column->changed_ticks[row] = world->tick;
         return;
     }
 
@@ -1442,7 +1649,7 @@ void tecs_set(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t com
     tecs_entity_t entity_id = old_chunk->entities[old_row];
 
     /* Add to new archetype */
-    tecs_archetype_add_entity(new_arch, entity_id, record, world->tick);
+    tecs_archetype_add_entity(world, new_arch, entity_id, record, world->tick);
 
     /* Copy existing component data */
     int new_chunk_idx = record->chunk_index;
@@ -1455,9 +1662,18 @@ void tecs_set(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t com
     /* Set new component data - O(1) hashmap lookup */
     int new_column_idx = tecs_component_map_get(&new_arch->data_component_map, component_id);
     if (new_column_idx >= 0) {
-        memcpy((char*)new_chunk->columns[new_column_idx].data + new_row * size, data, size);
-        new_chunk->columns[new_column_idx].changed_ticks[new_row] = world->tick;
-        new_chunk->columns[new_column_idx].added_ticks[new_row] = world->tick;
+        tecs_column_t* new_column = &new_chunk->columns[new_column_idx];
+        
+        /* Use storage provider API */
+        new_column->provider->set_data(
+            new_column->provider->user_data,
+            new_column->storage_data,
+            new_row,
+            data,
+            size
+        );
+        new_column->changed_ticks[new_row] = world->tick;
+        new_column->added_ticks[new_row] = world->tick;
     }
 
     /* Remove from old archetype */
@@ -1477,7 +1693,15 @@ void* tecs_get(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t co
     int chunk_idx = record->chunk_index;
     int row = record->row % TECS_CHUNK_SIZE;
     tecs_chunk_t* chunk = arch->chunks[chunk_idx];
-    return (char*)chunk->columns[column_idx].data + row * arch->data_components[column_idx].size;
+    tecs_column_t* column = &chunk->columns[column_idx];
+    
+    /* Use storage provider API */
+    return column->provider->get_ptr(
+        column->provider->user_data,
+        column->storage_data,
+        row,
+        arch->data_components[column_idx].size
+    );
 }
 
 const void* tecs_get_const(const tecs_world_t* world, tecs_entity_t entity,
@@ -1512,7 +1736,7 @@ void tecs_unset(tecs_world_t* world, tecs_entity_t entity, tecs_component_id_t c
     tecs_entity_t entity_id = old_chunk->entities[old_row];
 
     /* Add to new archetype */
-    tecs_archetype_add_entity(new_arch, entity_id, record, world->tick);
+    tecs_archetype_add_entity(world, new_arch, entity_id, record, world->tick);
 
     /* Copy remaining component data */
     int new_chunk_idx = record->chunk_index;
@@ -1713,7 +1937,16 @@ void* tecs_iter_column(const tecs_query_iter_t* iter, int index) {
     if (!iter->current_chunk || !iter->current_archetype) return NULL;
     if (index < 0 || index >= iter->current_archetype->data_component_count) return NULL;
 
-    return iter->current_chunk->columns[index].data;
+    tecs_column_t* column = &iter->current_chunk->columns[index];
+    
+    /* Fast path for native storage - return raw pointer to array */
+    if (column->is_native_storage) {
+        tecs_native_storage_t* storage = (tecs_native_storage_t*)column->storage_data;
+        return storage->data;
+    }
+    
+    /* Custom storage - return NULL (caller should use tecs_iter_get_at instead) */
+    return NULL;
 }
 
 tecs_tick_t* tecs_iter_changed_ticks(const tecs_query_iter_t* iter, int index) {
@@ -1728,6 +1961,29 @@ tecs_tick_t* tecs_iter_added_ticks(const tecs_query_iter_t* iter, int index) {
     if (index < 0 || index >= iter->current_archetype->data_component_count) return NULL;
 
     return iter->current_chunk->columns[index].added_ticks;
+}
+
+void* tecs_iter_get_at(const tecs_query_iter_t* iter, int column_index, int row_index) {
+    if (!iter->current_chunk || !iter->current_archetype) return NULL;
+    if (column_index < 0 || column_index >= iter->current_archetype->data_component_count) return NULL;
+    if (row_index < 0 || row_index >= iter->current_chunk->count) return NULL;
+    
+    tecs_column_t* column = &iter->current_chunk->columns[column_index];
+    int size = iter->current_archetype->data_components[column_index].size;
+    
+    return column->provider->get_ptr(
+        column->provider->user_data,
+        column->storage_data,
+        row_index,
+        size
+    );
+}
+
+tecs_storage_provider_t* tecs_iter_storage_provider(const tecs_query_iter_t* iter, int index) {
+    if (!iter->current_chunk || !iter->current_archetype) return NULL;
+    if (index < 0 || index >= iter->current_archetype->data_component_count) return NULL;
+    
+    return iter->current_chunk->columns[index].provider;
 }
 
 /* ============================================================================

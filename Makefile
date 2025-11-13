@@ -45,7 +45,7 @@ LIB_BEVY = $(BUILD_DIR)/libtinyecs_bevy.a
 # Targets
 EXAMPLES = $(BUILD_DIR)/example.exe $(BUILD_DIR)/example_bevy.exe $(BUILD_DIR)/example_performance.exe $(BUILD_DIR)/example_performance_opt.exe $(BUILD_DIR)/example_bevy_performance.exe $(BUILD_DIR)/example_iter_cache.exe $(BUILD_DIR)/example_iter_library_cache.exe
 
-TESTS = $(BUILD_DIR)/test_bevy_query.exe $(BUILD_DIR)/test_bevy_update.exe $(BUILD_DIR)/test_hierarchy.exe $(BUILD_DIR)/test_ids.exe
+TESTS = $(BUILD_DIR)/test_bevy_query.exe $(BUILD_DIR)/test_bevy_update.exe $(BUILD_DIR)/test_hierarchy.exe $(BUILD_DIR)/test_ids.exe $(BUILD_DIR)/test_core_api.exe $(BUILD_DIR)/test_storage_api.exe
 
 .PHONY: all clean debug release benchmark dll static test run-tests
 
@@ -99,12 +99,24 @@ $(BUILD_DIR)/test_hierarchy.exe: tests/test_hierarchy_debug.c $(HEADERS) | $(BUI
 $(BUILD_DIR)/test_ids.exe: tests/test_ids.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -I. -o $@ $<
 
+$(BUILD_DIR)/test_core_api.exe: tests/test_core_api.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I. -o $@ $<
+
+$(BUILD_DIR)/test_storage_api.exe: tests/test_storage_api.c $(HEADERS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I. -o $@ $<
+
 # Build all tests
 test: $(BUILD_DIR) $(TESTS)
 
 # Run all tests
 run-tests: $(TESTS)
 	@echo === Running All Tests ===
+	@echo ""
+	@echo Running build/test_core_api.exe...
+	@./build/test_core_api.exe
+	@echo ""
+	@echo Running build/test_storage_api.exe...
+	@./build/test_storage_api.exe
 	@echo ""
 	@echo Running build/test_bevy_query.exe...
 	@./build/test_bevy_query.exe

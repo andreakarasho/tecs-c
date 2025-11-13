@@ -116,6 +116,9 @@ public static unsafe class TinyEcs
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern ComponentId tecs_get_component_id(World world, byte* name);
 
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void* tecs_get_default_storage_provider();
+
     public static ComponentId RegisterComponent<T>(World world, string name) where T : unmanaged
     {
         var nameBytes = System.Text.Encoding.UTF8.GetBytes(name + "\0");
@@ -298,6 +301,12 @@ public static unsafe class TinyEcs
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern void* tecs_iter_column(QueryIter* iter, int index);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void* tecs_iter_get_at(QueryIter* iter, int columnIndex, int rowIndex);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void* tecs_iter_storage_provider(QueryIter* iter, int index);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern Tick* tecs_iter_changed_ticks(QueryIter* iter, int index);
