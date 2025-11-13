@@ -33,6 +33,9 @@ unsafe class Program
     {
         Console.WriteLine("=== TinyECS C# Bindings Example ===\n");
 
+        PerformanceTest();
+        return;
+
         // Example 1: Basic ECS usage
         Console.WriteLine("--- Example 1: Basic ECS Operations ---");
         BasicEcsExample();
@@ -320,7 +323,7 @@ unsafe class Program
 
     static void Setup(SystemContext* ctx, void* userData)
     {
-        const int COUNT = 1_000_000;
+        const int COUNT = 1_000;
 
         var commands = ctx->commands;
         // tbevy_commands_init(&commands, ctx->app);
@@ -352,21 +355,30 @@ unsafe class Program
         var query = tecs_query_new(ctx->world);
         tecs_query_with(query, posId);
         tecs_query_with(query, velId);
+        tecs_query_changed(query, velId);
         tecs_query_build(query);
 
         QueryIter iter;
         tecs_query_iter_init(&iter, query);
 
+        // var worldTick = tecs_world_tick(ctx->world);
         while (tecs_iter_next(&iter))
         {
             var count = tecs_iter_count(&iter);
             var pos = IterColumn<Position>(&iter, 0);
             var vel = IterColumn<Velocity>(&iter, 1);
+            // var velChangedTicks = tecs_iter_changed_ticks(&iter, 1);
+
             for (var i = 0; i < count; ++i)
             {
-                pos->X += vel->X;
-                pos->Y += vel->Y;
+                // if (velChangedTicks[i].Value < worldTick.Value)
+                // {
+                //     continue;
+                // }
+                pos[i].X *= vel[i].X;
+                pos[i].Y *= vel[i].Y;
             }
+
         }
 
         tecs_query_free(query);
