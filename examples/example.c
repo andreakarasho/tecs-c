@@ -43,7 +43,7 @@ void move_system(tecs_world_t* world, float delta_time) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Position* positions = (Position*)tecs_iter_column(iter, 0);
         Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);
@@ -66,7 +66,7 @@ void print_positions(tecs_world_t* world) {
 
     printf("\nEntity positions:\n");
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Position* positions = (Position*)tecs_iter_column(iter, 0);
@@ -91,7 +91,7 @@ void print_player_health(tecs_world_t* world) {
 
     printf("\nPlayer health:\n");
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Health* healths = (Health*)tecs_iter_column(iter, 0);
@@ -119,7 +119,7 @@ void detect_changed_positions(tecs_world_t* world) {
     int changed_count = 0;
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Position* positions = (Position*)tecs_iter_column(iter, 0);

@@ -160,6 +160,7 @@ TECS_API void tecs_world_clear(tecs_world_t* world);
 
 /* Component Registration */
 TECS_API tecs_component_id_t tecs_register_component(tecs_world_t* world, const char* name, int size);
+TECS_API tecs_component_id_t tecs_get_component_id(const tecs_world_t* world, const char* name);
 
 /* Entity Operations */
 TECS_API tecs_entity_t tecs_entity_new(tecs_world_t* world);
@@ -225,7 +226,7 @@ TECS_API void tecs_query_build(tecs_query_t* query);
 TECS_API tecs_query_iter_t* tecs_query_iter(tecs_query_t* query);
 TECS_API tecs_query_iter_t* tecs_query_iter_cached(tecs_query_t* query);
 TECS_API void tecs_query_iter_init(tecs_query_iter_t* iter, tecs_query_t* query);
-TECS_API bool tecs_query_next(tecs_query_iter_t* iter);
+TECS_API bool tecs_iter_next(tecs_query_iter_t* iter);
 TECS_API void tecs_query_iter_free(tecs_query_iter_t* iter);
 TECS_API int tecs_iter_count(const tecs_query_iter_t* iter);
 TECS_API tecs_entity_t* tecs_iter_entities(const tecs_query_iter_t* iter);
@@ -1147,6 +1148,20 @@ tecs_component_id_t tecs_register_component(tecs_world_t* world, const char* nam
     return id;
 }
 
+tecs_component_id_t tecs_get_component_id(const tecs_world_t* world, const char* name) {
+    if (!world || !name) {
+        return 0;
+    }
+
+    for (int i = 0; i < world->component_count; i++) {
+        if (strcmp(world->component_registry[i].name, name) == 0) {
+            return world->component_registry[i].id;
+        }
+    }
+
+    return 0;  /* Component not found */
+}
+
 /* ============================================================================
  * Archetype Hash Table
  * ========================================================================= */
@@ -1610,7 +1625,7 @@ tecs_query_iter_t* tecs_query_iter_cached(tecs_query_t* query) {
     return &query->cached_iter;
 }
 
-bool tecs_query_next(tecs_query_iter_t* iter) {
+bool tecs_iter_next(tecs_query_iter_t* iter) {
     if (!iter || !iter->query) return false;
 
     /* Advance to next chunk */

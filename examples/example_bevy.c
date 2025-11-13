@@ -163,7 +163,7 @@ static void movement_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_iter_t* iter = tecs_query_iter(query);
     int moved_count = 0;
 
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Position* positions = (Position*)tecs_iter_column(iter, 0);
         Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);
@@ -247,7 +247,7 @@ static void debug_print_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Position* positions = (Position*)tecs_iter_column(iter, 0);
         Health* healths = (Health*)tecs_iter_column(iter, 1);

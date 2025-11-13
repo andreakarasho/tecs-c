@@ -225,7 +225,7 @@ static void movement_system(tbevy_app_t* app, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
         Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);
@@ -256,7 +256,7 @@ static void player_input_system(tbevy_app_t* app, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -324,7 +324,7 @@ static void enemy_ai_system(tbevy_app_t* app, void* user_data) {
     bool player_found = false;
 
     tecs_query_iter_t* player_iter = tecs_query_iter(player_query);
-    if (tecs_query_next(player_iter)) {
+    if (tecs_iter_next(player_iter)) {
         Transform* player_transforms = (Transform*)tecs_iter_column(player_iter, 0);
         player_x = player_transforms[0].x;
         player_y = player_transforms[0].y;
@@ -343,7 +343,7 @@ static void enemy_ai_system(tbevy_app_t* app, void* user_data) {
     tecs_query_build(enemy_query);
 
     tecs_query_iter_t* iter = tecs_query_iter(enemy_query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
         Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);
@@ -384,7 +384,7 @@ static void collision_system(tbevy_app_t* app, void* user_data) {
     int collider_count = 0;
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter) && collider_count < 256) {
+    while (tecs_iter_next(iter) && collider_count < 256) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -642,7 +642,7 @@ static void hierarchy_update_system(tbevy_app_t* app, void* user_data) {
     tecs_query_build(turret_query);
 
     tecs_query_iter_t* iter = tecs_query_iter(turret_query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -669,7 +669,7 @@ static void hierarchy_update_system(tbevy_app_t* app, void* user_data) {
     tecs_query_build(shield_query);
 
     iter = tecs_query_iter(shield_query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -707,7 +707,7 @@ static void bullet_lifetime_system(tbevy_app_t* app, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Bullet* bullets = (Bullet*)tecs_iter_column(iter, 0);
@@ -736,7 +736,7 @@ static void bounds_check_system(tbevy_app_t* app, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -780,7 +780,7 @@ static void debug_render_system(tbevy_app_t* app, void* user_data) {
     printf("Entities:\n");
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
         Sprite* sprites = (Sprite*)tecs_iter_column(iter, 1);

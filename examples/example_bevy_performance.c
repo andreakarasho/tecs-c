@@ -78,7 +78,7 @@ static void update_system(tbevy_system_ctx_t* ctx, void* user_data) {
     /* Use library-cached iterator - no allocation! */
     tecs_query_iter_t* iter = tecs_query_iter_cached(query);
 
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Position* positions = (Position*)tecs_iter_column(iter, 0);
         Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);
@@ -144,7 +144,7 @@ int main(void) {
     printf("[Main] Verifying query...\n");
     int verify_count = 0;
     tecs_query_iter_t* verify_iter = tecs_query_iter_cached(query);
-    while (tecs_query_next(verify_iter)) {
+    while (tecs_iter_next(verify_iter)) {
         verify_count += tecs_iter_count(verify_iter);
     }
     printf("[Main] Query returns %d entities\n\n", verify_count);

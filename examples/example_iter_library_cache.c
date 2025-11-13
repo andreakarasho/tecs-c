@@ -79,7 +79,7 @@ int main(void) {
     for (int frame = 0; frame < ITERATIONS; frame++) {
         tecs_query_iter_t* iter = tecs_query_iter(query);
 
-        while (tecs_query_next(iter)) {
+        while (tecs_iter_next(iter)) {
             int count = tecs_iter_count(iter);
             Position* positions = (Position*)tecs_iter_column(iter, 0);
             Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);
@@ -108,7 +108,7 @@ int main(void) {
     for (int frame = 0; frame < ITERATIONS; frame++) {
         tecs_query_iter_init(&user_cached_iter, query);
 
-        while (tecs_query_next(&user_cached_iter)) {
+        while (tecs_iter_next(&user_cached_iter)) {
             int count = tecs_iter_count(&user_cached_iter);
             Position* positions = (Position*)tecs_iter_column(&user_cached_iter, 0);
             Velocity* velocities = (Velocity*)tecs_iter_column(&user_cached_iter, 1);
@@ -134,7 +134,7 @@ int main(void) {
         /* Query manages its own cached iterator! */
         tecs_query_iter_t* iter = tecs_query_iter_cached(query);
 
-        while (tecs_query_next(iter)) {
+        while (tecs_iter_next(iter)) {
             int count = tecs_iter_count(iter);
             Position* positions = (Position*)tecs_iter_column(iter, 0);
             Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);

@@ -137,7 +137,7 @@ int main(void) {
         for (int frame = 0; frame < FRAMES_PER_BATCH; frame++) {
             /* Update system - multiply position by velocity */
             tecs_query_iter_t* iter = tecs_query_iter(query);
-            while (tecs_query_next(iter)) {
+            while (tecs_iter_next(iter)) {
                 int count = tecs_iter_count(iter);
                 Position* positions = (Position*)tecs_iter_column(iter, 0);
                 Velocity* velocities = (Velocity*)tecs_iter_column(iter, 1);

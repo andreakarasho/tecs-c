@@ -166,7 +166,7 @@ static void movement_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Transform3D* transforms = (Transform3D*)tecs_iter_column(iter, 0);
         Velocity3D* velocities = (Velocity3D*)tecs_iter_column(iter, 1);
@@ -200,7 +200,7 @@ static void player_input_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform3D* transforms = (Transform3D*)tecs_iter_column(iter, 0);
@@ -294,7 +294,7 @@ static void enemy_ai_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(player_query);
 
     tecs_query_iter_t* player_iter = tecs_query_iter(player_query);
-    if (tecs_query_next(player_iter)) {
+    if (tecs_iter_next(player_iter)) {
         Transform3D* player_transforms = (Transform3D*)tecs_iter_column(player_iter, 0);
         player_pos = player_transforms[0].position;
         player_found = true;
@@ -312,7 +312,7 @@ static void enemy_ai_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(enemy_query);
 
     tecs_query_iter_t* iter = tecs_query_iter(enemy_query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Transform3D* transforms = (Transform3D*)tecs_iter_column(iter, 0);
         Velocity3D* velocities = (Velocity3D*)tecs_iter_column(iter, 1);
@@ -353,7 +353,7 @@ static void turret_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform3D* transforms = (Transform3D*)tecs_iter_column(iter, 0);
@@ -395,7 +395,7 @@ static void shield_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform3D* transforms = (Transform3D*)tecs_iter_column(iter, 0);
@@ -444,7 +444,7 @@ static void bullet_lifetime_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Bullet* bullets = (Bullet*)tecs_iter_column(iter, 0);
@@ -485,13 +485,13 @@ static void collision_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(enemy_query);
 
     tecs_query_iter_t* bullet_iter = tecs_query_iter(bullet_query);
-    while (tecs_query_next(bullet_iter)) {
+    while (tecs_iter_next(bullet_iter)) {
         int bullet_count = tecs_iter_count(bullet_iter);
         tecs_entity_t* bullet_entities = tecs_iter_entities(bullet_iter);
         Transform3D* bullet_transforms = (Transform3D*)tecs_iter_column(bullet_iter, 0);
 
         tecs_query_iter_t* enemy_iter = tecs_query_iter(enemy_query);
-        while (tecs_query_next(enemy_iter)) {
+        while (tecs_iter_next(enemy_iter)) {
             int enemy_count = tecs_iter_count(enemy_iter);
             tecs_entity_t* enemy_entities = tecs_iter_entities(enemy_iter);
             Transform3D* enemy_transforms = (Transform3D*)tecs_iter_column(enemy_iter, 0);
@@ -578,7 +578,7 @@ static void particle_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform3D* transforms = (Transform3D*)tecs_iter_column(iter, 0);
@@ -701,7 +701,7 @@ static void camera_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    if (tecs_query_next(iter)) {
+    if (tecs_iter_next(iter)) {
         Transform3D* player_transforms = (Transform3D*)tecs_iter_column(iter, 0);
         Vector3 player_pos = player_transforms[0].position;
 
@@ -744,7 +744,7 @@ static void render_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         Transform3D* transforms = (Transform3D*)tecs_iter_column(iter, 0);
         MeshRenderer* renderers = (MeshRenderer*)tecs_iter_column(iter, 1);

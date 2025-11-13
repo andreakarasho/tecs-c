@@ -35,7 +35,7 @@ int main(void) {
     
     int total_entities = 0;
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         printf("  Chunk: %d entities\n", count);
         total_entities += count;

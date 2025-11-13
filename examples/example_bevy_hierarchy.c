@@ -74,7 +74,7 @@ static void turret_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -119,7 +119,7 @@ static void shield_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -161,7 +161,7 @@ static void movement_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -205,7 +205,7 @@ static void debug_print_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     tecs_query_iter_t* iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Transform* transforms = (Transform*)tecs_iter_column(iter, 0);
@@ -245,7 +245,7 @@ static void debug_print_system(tbevy_system_ctx_t* ctx, void* user_data) {
     tecs_query_build(query);
 
     iter = tecs_query_iter(query);
-    while (tecs_query_next(iter)) {
+    while (tecs_iter_next(iter)) {
         int count = tecs_iter_count(iter);
         tecs_entity_t* entities = tecs_iter_entities(iter);
         Name* names = (Name*)tecs_iter_column(iter, 1);
