@@ -272,6 +272,7 @@ TECS_API int tecs_iter_count(const tecs_query_iter_t* iter);
 TECS_API tecs_entity_t* tecs_iter_entities(const tecs_query_iter_t* iter);
 TECS_API void* tecs_iter_column(const tecs_query_iter_t* iter, int index);
 TECS_API void* tecs_iter_get_at(const tecs_query_iter_t* iter, int column_index, int row_index);
+TECS_API void* tecs_iter_chunk_data(const tecs_query_iter_t* iter, int column_index);  /* Get chunk storage data for pluggable storage */
 TECS_API tecs_storage_provider_t* tecs_iter_storage_provider(const tecs_query_iter_t* iter, int index);
 TECS_API tecs_tick_t* tecs_iter_changed_ticks(const tecs_query_iter_t* iter, int index);
 TECS_API tecs_tick_t* tecs_iter_added_ticks(const tecs_query_iter_t* iter, int index);
@@ -1979,10 +1980,17 @@ void* tecs_iter_get_at(const tecs_query_iter_t* iter, int column_index, int row_
     );
 }
 
+TECS_API void* tecs_iter_chunk_data(const tecs_query_iter_t* iter, int column_index) {
+    if (!iter->current_chunk || !iter->current_archetype) return NULL;
+    if (column_index < 0 || column_index >= iter->current_archetype->data_component_count) return NULL;
+
+    return iter->current_chunk->columns[column_index].storage_data;
+}
+
 tecs_storage_provider_t* tecs_iter_storage_provider(const tecs_query_iter_t* iter, int index) {
     if (!iter->current_chunk || !iter->current_archetype) return NULL;
     if (index < 0 || index >= iter->current_archetype->data_component_count) return NULL;
-    
+
     return iter->current_chunk->columns[index].provider;
 }
 

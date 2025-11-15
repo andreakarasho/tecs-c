@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace TinyEcsBindings;
 
@@ -119,12 +120,12 @@ public static unsafe class TinyEcs
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern void* tecs_get_default_storage_provider();
 
-    public static ComponentId RegisterComponent<T>(World world, string name) where T : unmanaged
+    public static ComponentId RegisterComponent<T>(World world, string name) where T : notnull
     {
         var nameBytes = System.Text.Encoding.UTF8.GetBytes(name + "\0");
         fixed (byte* namePtr = nameBytes)
         {
-            return tecs_register_component(world, namePtr, sizeof(T));
+            return tecs_register_component(world, namePtr, Unsafe.SizeOf<T>());
         }
     }
 

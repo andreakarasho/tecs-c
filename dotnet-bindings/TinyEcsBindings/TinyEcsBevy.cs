@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace TinyEcsBindings;
@@ -63,8 +64,9 @@ public static unsafe class TinyEcsBevy
 
     public enum ThreadingMode
     {
-        SingleThreaded = 0,
-        MultiThreaded = 1
+        Auto = 0,
+        SingleThreaded = 1,
+        MultiThreaded = 2
     }
 
     public enum StageId
@@ -283,6 +285,24 @@ public static unsafe class TinyEcsBevy
     {
         T* ptr = &value;
         return tbevy_entity_insert(ec, componentId, ptr, sizeof(T));
+    }
+
+    /// <summary>
+    /// Insert a managed component into an entity via deferred commands.
+    /// The component value is stored in a command buffer until commands are applied.
+    /// Call ManagedStorage.ClearCommandBuffers() after tbevy_commands_apply().
+    /// </summary>
+    public static EntityCommands* EntityInsertManaged<T>(EntityCommands* ec, TinyEcs.ComponentId componentId, T? value) where T : notnull
+    {
+        // Store the managed object in the command buffer to prevent GC
+        var commandBuffer = ManagedStorage.GetOrCreateCommandBuffer<T>(componentId);
+        int bufferIndex = commandBuffer.Store(value);
+
+        // Encode buffer index as negative IntPtr: -(index + 1)
+        IntPtr encodedIndex = new IntPtr(-(bufferIndex + 1));
+
+        // Pass the encoded index to the native command system
+        return tbevy_entity_insert(ec, componentId, &encodedIndex, IntPtr.Size);
     }
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

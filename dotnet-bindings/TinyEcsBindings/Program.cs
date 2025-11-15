@@ -3,6 +3,7 @@ using static TinyEcsBindings.TinyEcs;
 using static TinyEcsBindings.TinyEcsBevy;
 using SystemContext = TinyEcsBindings.TinyEcsBevy.SystemContext;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 // Component types
 struct Position
@@ -24,9 +25,9 @@ struct GameState
 }
 
 // Managed component types (for demonstration)
-class Name
+struct Name
 {
-    public string Value { get; set; } = "";
+    public string Value { get; set; }
 
     public override string ToString() => Value;
 }
@@ -63,7 +64,10 @@ unsafe class Program
         Console.WriteLine("\n--- Example 4: Pluggable Storage System ---");
         PluggableStorageExample();
 
-        Console.WriteLine("\n--- Example 5: Performance Test ---");
+        Console.WriteLine("\n--- Example 5: Managed Components ---");
+        ManagedComponentExample();
+
+        Console.WriteLine("\n--- Example 6: Performance Test ---");
         PerformanceTest();
     }
 
@@ -341,6 +345,56 @@ unsafe class Program
         }
     }
 
+    static void ManagedComponentExample()
+    {
+        var world = tecs_world_new();
+
+        // Register managed components with custom storage
+        ManagedStorage.ManagedStorageProvider<Name>? nameStorage = null;
+        ManagedStorage.ManagedStorageProvider<Description>? descStorage = null;
+
+        try
+        {
+            var nameId = ManagedStorage.RegisterManagedComponent(world, "Name", out nameStorage);
+            var descId = ManagedStorage.RegisterManagedComponent(world, "Description", out descStorage);
+
+            Console.WriteLine($"Registered managed components: Name={nameId.Value}, Description={descId.Value}\n");
+
+            // Create entities
+            var player = tecs_entity_new(world);
+            var enemy = tecs_entity_new(world);
+
+            var desc = new Description
+            {
+                Text = "The main character",
+                Tags = new List<string> { "player", "hero" }
+            };
+            // Add managed components
+            nameStorage.AddComponent(world, player, nameId, new Name { Value = "Hero" });
+            descStorage.AddComponent(world, player, descId, desc);
+
+            nameStorage.AddComponent(world, enemy, nameId, new Name { Value = "Goblin" });
+
+            Console.WriteLine("✓ Added managed components\n");
+
+            // Test GetComponent
+            ref var retrievedName = ref nameStorage.GetComponent(world, player, nameId);
+            Console.WriteLine($"✓ Retrieved via GetComponent: {retrievedName.Value ?? "(null)"}");
+
+            Console.WriteLine("=== Managed Components Benefits ===");
+            Console.WriteLine("✓ Single GCHandle per column");
+            Console.WriteLine("✓ No boxing/unboxing");
+            Console.WriteLine("✓ Direct object references");
+            Console.WriteLine("✓ Modify in place");
+        }
+        finally
+        {
+            nameStorage?.Dispose();
+            descStorage?.Dispose();
+            tecs_world_free(world);
+        }
+    }
+
     static void PluggableStorageExample()
     {
         Console.WriteLine("Demonstrating pluggable storage system...\n");
@@ -391,7 +445,7 @@ unsafe class Program
 
     static void Setup(SystemContext* ctx, void* userData)
     {
-        const int COUNT = 524288 * 2;
+        const int COUNT = 524288 * 2;  // Reduced for testing span approach
 
         var commands = ctx->commands;
         // tbevy_commands_init(&commands, ctx->app);
@@ -399,15 +453,18 @@ unsafe class Program
 
         var posId = ComponentStorage.GetComponentId<Position>(ctx->world);
         var velId = ComponentStorage.GetComponentId<Velocity>(ctx->world);
+        var nameId = ComponentStorage.GetComponentId<Name>(ctx->world);
 
         Console.WriteLine("posId {0}", posId.Value);
         Console.WriteLine("velId {0}", velId.Value);
+        Console.WriteLine("nameId {0}", nameId.Value);
 
         for (int i = 0; i < COUNT; i++)
         {
             var entity = tbevy_commands_spawn(commands);
             EntityInsert(&entity, posId, new Position() { X = 1.0f, Y = 1.0f });
             EntityInsert(&entity, velId, new Velocity() { X = 1.0001f, Y = 1.0001f });
+            EntityInsertManaged(&entity, nameId, new Name() { Value = $"Entity_{i}" });
         }
 
         tbevy_commands_apply(commands);
@@ -415,30 +472,44 @@ unsafe class Program
         Console.WriteLine("Setup completed");
     }
 
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static Span<T> Column<T>(QueryIter* iter, int columnIndex) where T : notnull
+    {
+        if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        {
+            return ManagedStorage.GetManagedSpan<T>(iter, columnIndex);
+        }
+
+        var count = tecs_iter_count(iter);
+        var ptr = tecs_iter_column(iter, columnIndex);
+        return new Span<T>(ptr, count);
+    }
+
     static void Performance(SystemContext* ctx, void* userData)
     {
         var posId = ComponentStorage.GetComponentId<Position>(ctx->world);
         var velId = ComponentStorage.GetComponentId<Velocity>(ctx->world);
+        var nameId = ComponentStorage.GetComponentId<Name>(ctx->world);
 
         var query = tecs_query_new(ctx->world);
         tecs_query_with(query, posId);
         tecs_query_with(query, velId);
-        tecs_query_changed(query, velId);
+        tecs_query_with(query, nameId);
         tecs_query_build(query);
 
         // QueryIter iter;
         // tecs_query_iter_init(&iter, query);
         var iter = tecs_query_iter_cached(query);
 
-        // var worldTick = tecs_world_tick(ctx->world);
+        // // var worldTick = tecs_world_tick(ctx->world);
         while (tecs_iter_next(iter))
         {
             var count = tecs_iter_count(iter);
-            var pos = IterColumn<Position>(iter, 0);
-            var vel = IterColumn<Velocity>(iter, 1);
+            var pos = Column<Position>(iter, 0);
+            var vel = Column<Velocity>(iter, 1);
+            var name = Column<Name>(iter, 2);
 
-            // var span0 = new Span<Position>(pos, count);
-            // var span1 = new Span<Velocity>(vel, count);
             // var velChangedTicks = tecs_iter_changed_ticks(&iter, 1);
 
             for (var i = 0; i < count; ++i)
@@ -451,8 +522,9 @@ unsafe class Program
                 // }
                 pos[i].X *= vel[i].X;
                 pos[i].Y *= vel[i].Y;
+                ref var n = ref name[i];
+                // n.Value = $"Updated_{n.Value}";
             }
-
         }
 
         tecs_query_free(query);
@@ -465,6 +537,7 @@ unsafe class Program
 
         ComponentStorage.Register<Position>(world);
         ComponentStorage.Register<Velocity>(world);
+        ComponentStorage.Register<Name>(world);
 
         var stageStartup = tbevy_stage_default(StageId.Startup);
         var stageUpdate = tbevy_stage_default(StageId.Update);
@@ -499,16 +572,39 @@ unsafe class Program
 
 static class ComponentStorage
 {
-    private static Dictionary<IntPtr, Dictionary<Type, ComponentId>> _components = new ();
+    private static readonly Dictionary<IntPtr, Dictionary<Type, ComponentId>> _components = new();
+    private static readonly Dictionary<IntPtr, Dictionary<Type, object>> _storageProviders = new();
 
-    public static void Register<T>(World world) where T : unmanaged
+    public static void Register<T>(World world) where T : notnull
     {
         if (!_components.ContainsKey(world.Handle))
-            _components[world.Handle] = new ();
+            _components[world.Handle] = new();
+
+        if (!_storageProviders.ContainsKey(world.Handle))
+            _storageProviders[world.Handle] = new();
 
         var name = typeof(T).ToString();
+        if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        {
+            RegisterManagedComponent<T>(world, name);
+        }
+        else
+        {
+            RegisterUnamanged<T>(world, name);
+        }
+    }
+
+    private static void RegisterUnamanged<T>(World world, string name) where T : notnull
+    {
         var id = RegisterComponent<T>(world, name);
         _components[world.Handle][typeof(T)] = id;
+    }
+
+    private static void RegisterManagedComponent<T>(World world, string name) where T : notnull
+    {
+        var id = ManagedStorage.RegisterManagedComponent<T>(world, name, out var provider);
+        _components[world.Handle][typeof(T)] = id;
+        _storageProviders[world.Handle][typeof(T)] = provider; // Keep provider alive!
     }
 
     public static ComponentId GetComponentId<T>(World world)
