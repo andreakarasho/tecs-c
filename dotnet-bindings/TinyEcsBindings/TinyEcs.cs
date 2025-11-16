@@ -304,9 +304,6 @@ public static unsafe class TinyEcs
     public static extern void* tecs_iter_column(QueryIter* iter, int index);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void* tecs_iter_get_at(QueryIter* iter, int columnIndex, int rowIndex);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern void* tecs_iter_storage_provider(QueryIter* iter, int index);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

@@ -60,9 +60,6 @@ public static unsafe class ManagedStorage
     public static extern StorageProvider* tecs_get_default_storage_provider();
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern void* tecs_iter_get_at(TinyEcs.QueryIter* iter, int columnIndex, int rowIndex);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern void* tecs_iter_chunk_data(TinyEcs.QueryIter* iter, int columnIndex);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
@@ -201,63 +198,68 @@ public static unsafe class ManagedStorage
     /// </summary>
     public sealed class ManagedStorageProvider<T> : IDisposable where T : notnull
     {
-        private readonly List<ManagedComponentStorage<T>> storages = new();
-        private readonly Dictionary<IntPtr, ManagedComponentStorage<T>> chunkToStorage = new();
-        private readonly GCHandle storagesHandle;
-        private readonly StorageProvider provider;
-        private readonly GCHandle providerHandle;
+        private readonly List<ManagedComponentStorage<T>> _storages = new();
+        private readonly Dictionary<IntPtr, ManagedComponentStorage<T>> _chunkToStorage = new();
+        private readonly GCHandle _storagesHandle;
+        private readonly StorageProvider _provider;
+        private readonly GCHandle _providerHandle;
 
-        private readonly AllocChunkDelegate allocDelegate;
-        private readonly FreeChunkDelegate freeDelegate;
-        private readonly GetPtrDelegate getPtrDelegate;
-        private readonly SetDataDelegate setDataDelegate;
-        private readonly CopyDataDelegate copyDataDelegate;
-        private readonly SwapDataDelegate swapDataDelegate;
+        private readonly AllocChunkDelegate _allocDelegate;
+        private readonly FreeChunkDelegate _freeDelegate;
+        private readonly GetPtrDelegate _getPtrDelegate;
+        private readonly SetDataDelegate _setDataDelegate;
+        private readonly CopyDataDelegate _copyDataDelegate;
+        private readonly SwapDataDelegate _swapDataDelegate;
 
-        private bool disposed;
-        internal TinyEcs.ComponentId componentId; // Store component ID for command buffer access
+        private bool _disposed;
+        private TinyEcs.ComponentId _componentId; // Store component ID for command buffer access
+
+        internal void SetComponentId(TinyEcs.ComponentId componentId)
+        {
+            _componentId = componentId;
+        }
 
         public ManagedStorageProvider()
         {
             // Keep delegates alive to prevent GC collection
-            allocDelegate = AllocChunk;
-            freeDelegate = FreeChunk;
-            getPtrDelegate = GetPtr;
-            setDataDelegate = SetData;
-            copyDataDelegate = CopyData;
-            swapDataDelegate = SwapData;
+            _allocDelegate = AllocChunk;
+            _freeDelegate = FreeChunk;
+            _getPtrDelegate = GetPtr;
+            _setDataDelegate = SetData;
+            _copyDataDelegate = CopyData;
+            _swapDataDelegate = SwapData;
 
-            storagesHandle = GCHandle.Alloc(storages);
+            _storagesHandle = GCHandle.Alloc(_storages);
 
-            provider = new StorageProvider
+            _provider = new StorageProvider
             {
-                alloc_chunk = Marshal.GetFunctionPointerForDelegate(allocDelegate),
-                free_chunk = Marshal.GetFunctionPointerForDelegate(freeDelegate),
-                get_ptr = Marshal.GetFunctionPointerForDelegate(getPtrDelegate),
-                set_data = Marshal.GetFunctionPointerForDelegate(setDataDelegate),
-                copy_data = Marshal.GetFunctionPointerForDelegate(copyDataDelegate),
-                swap_data = Marshal.GetFunctionPointerForDelegate(swapDataDelegate),
-                user_data = GCHandle.ToIntPtr(storagesHandle),
+                alloc_chunk = Marshal.GetFunctionPointerForDelegate(_allocDelegate),
+                free_chunk = Marshal.GetFunctionPointerForDelegate(_freeDelegate),
+                get_ptr = Marshal.GetFunctionPointerForDelegate(_getPtrDelegate),
+                set_data = Marshal.GetFunctionPointerForDelegate(_setDataDelegate),
+                copy_data = Marshal.GetFunctionPointerForDelegate(_copyDataDelegate),
+                swap_data = Marshal.GetFunctionPointerForDelegate(_swapDataDelegate),
+                user_data = GCHandle.ToIntPtr(_storagesHandle),
                 name = Marshal.StringToHGlobalAnsi($"managed<{typeof(T).ToString()}>")
             };
 
-            providerHandle = GCHandle.Alloc(provider, GCHandleType.Pinned);
+            _providerHandle = GCHandle.Alloc(_provider, GCHandleType.Pinned);
         }
 
         public StorageProvider* GetProviderPointer()
         {
-            return (StorageProvider*)providerHandle.AddrOfPinnedObject();
+            return (StorageProvider*)_providerHandle.AddrOfPinnedObject();
         }
 
         private void* AllocChunk(void* userData, int componentSize, int capacity)
         {
             var storage = new ManagedComponentStorage<T>(capacity);
-            storages.Add(storage);
+            _storages.Add(storage);
             var handle = GCHandle.Alloc(storage);
             var handlePtr = GCHandle.ToIntPtr(handle);
 
             // Store mapping from chunkData to storage (both local and global)
-            chunkToStorage[handlePtr] = storage;
+            _chunkToStorage[handlePtr] = storage;
 
             return (void*)handlePtr;
         }
@@ -267,10 +269,10 @@ public static unsafe class ManagedStorage
             if (chunkData == null) return;
 
             var chunkPtr = (IntPtr)chunkData;
-            if (chunkToStorage.TryGetValue(chunkPtr, out var storage))
+            if (_chunkToStorage.TryGetValue(chunkPtr, out var storage))
             {
-                chunkToStorage.Remove(chunkPtr);
-                storages.Remove(storage);
+                _chunkToStorage.Remove(chunkPtr);
+                _storages.Remove(storage);
                 storage.Dispose();
             }
 
@@ -279,13 +281,6 @@ public static unsafe class ManagedStorage
             {
                 handle.Free();
             }
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct ValueTupleIntPtrInt
-        {
-            public IntPtr Item1;
-            public int Item2;
         }
 
         private void* GetPtr(void* userData, void* chunkData, int index, int size)
@@ -311,7 +306,7 @@ public static unsafe class ManagedStorage
                 {
                     // Decode buffer index: -(index + 1)
                     int bufferIndex = -(int)dataValue.ToInt64() - 1;
-                    var commandBuffer = GetOrCreateCommandBuffer<T>(componentId);
+                    var commandBuffer = GetOrCreateCommandBuffer<T>(_componentId);
                     T? obj = commandBuffer.Get(bufferIndex);
                     storage.Set(index, ref obj);
                 }
@@ -373,24 +368,24 @@ public static unsafe class ManagedStorage
 
         public void Dispose()
         {
-            if (!disposed)
+            if (!_disposed)
             {
-                foreach (var storage in storages)
+                foreach (var storage in _storages)
                 {
                     storage.Dispose();
                 }
-                storages.Clear();
+                _storages.Clear();
 
-                if (storagesHandle.IsAllocated)
-                    storagesHandle.Free();
+                if (_storagesHandle.IsAllocated)
+                    _storagesHandle.Free();
 
-                if (providerHandle.IsAllocated)
-                    providerHandle.Free();
+                if (_providerHandle.IsAllocated)
+                    _providerHandle.Free();
 
-                if (provider.name != IntPtr.Zero)
-                    Marshal.FreeHGlobal(provider.name);
+                if (_provider.name != IntPtr.Zero)
+                    Marshal.FreeHGlobal(_provider.name);
 
-                disposed = true;
+                _disposed = true;
             }
         }
 
@@ -425,7 +420,7 @@ public static unsafe class ManagedStorage
             );
 
             // Store component ID in the provider for command buffer access
-            storageProvider.componentId = componentId;
+            storageProvider.SetComponentId(componentId);
 
             return componentId;
         }
@@ -436,7 +431,8 @@ public static unsafe class ManagedStorage
     /// </summary>
     public static T* GetAt<T>(TinyEcs.QueryIter* iter, int columnIndex, int rowIndex) where T : unmanaged
     {
-        return (T*)tecs_iter_get_at(iter, columnIndex, rowIndex);
+        var column = TinyEcs.tecs_iter_column(iter, columnIndex);
+        return column != null ? &((T*)column)[rowIndex] : null;
     }
 
     /// <summary>
