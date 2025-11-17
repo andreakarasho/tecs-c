@@ -65,7 +65,7 @@ public static unsafe class TinyEcs
         public uint Index => (uint)(Value & 0xFFFFFFFF);
         public uint Generation => (uint)(Value >> 32);
 
-        public static Entity Null => new(0);
+        public static readonly Entity Null = new(0);
         public bool IsNull => Value == 0;
     }
 
@@ -75,7 +75,7 @@ public static unsafe class TinyEcs
 
         public ComponentId(uint value) => Value = value;
 
-        public static ComponentId Invalid => new(0xFFFFFFFF);
+        public static readonly ComponentId Invalid = new(0xFFFFFFFF);
     }
 
     public readonly struct Tick
@@ -302,6 +302,9 @@ public static unsafe class TinyEcs
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern void* tecs_iter_column(QueryIter* iter, int index);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int tecs_iter_column_index(QueryIter* iter, ComponentId componentId);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern void* tecs_iter_storage_provider(QueryIter* iter, int index);

@@ -271,6 +271,7 @@ TECS_API void tecs_query_iter_free(tecs_query_iter_t* iter);
 TECS_API int tecs_iter_count(const tecs_query_iter_t* iter);
 TECS_API tecs_entity_t* tecs_iter_entities(const tecs_query_iter_t* iter);
 TECS_API void* tecs_iter_column(const tecs_query_iter_t* iter, int index);
+TECS_API int tecs_iter_column_index(const tecs_query_iter_t* iter, tecs_component_id_t component_id);  /* Get column index for a component ID */
 TECS_API void* tecs_iter_chunk_data(const tecs_query_iter_t* iter, int column_index);  /* Get chunk storage data for pluggable storage */
 TECS_API tecs_storage_provider_t* tecs_iter_storage_provider(const tecs_query_iter_t* iter, int index);
 TECS_API tecs_tick_t* tecs_iter_changed_ticks(const tecs_query_iter_t* iter, int index);
@@ -1961,6 +1962,11 @@ tecs_tick_t* tecs_iter_added_ticks(const tecs_query_iter_t* iter, int index) {
     if (index < 0 || index >= iter->current_archetype->data_component_count) return NULL;
 
     return iter->current_chunk->columns[index].added_ticks;
+}
+
+TECS_API int tecs_iter_column_index(const tecs_query_iter_t* iter, tecs_component_id_t component_id) {
+    if (!iter->current_archetype) return -1;
+    return tecs_component_map_get(&iter->current_archetype->data_component_map, component_id);
 }
 
 TECS_API void* tecs_iter_chunk_data(const tecs_query_iter_t* iter, int column_index) {

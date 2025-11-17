@@ -32,10 +32,16 @@ struct Name
     public override string ToString() => Value;
 }
 
-class Description
+struct Description
 {
-    public string Text { get; set; } = "";
-    public List<string> Tags { get; set; } = new();
+    public string Text { get; set; }
+    public List<string> Tags { get; set; }
+
+    public Description(string text, List<string> tags)
+    {
+        Text = text;
+        Tags = tags;
+    }
 
     public override string ToString() => $"{Text} [{string.Join(", ", Tags)}]";
 }
@@ -67,189 +73,146 @@ unsafe class Program
         Console.WriteLine("\n--- Example 5: Managed Components ---");
         ManagedComponentExample();
 
-        Console.WriteLine("\n--- Example 6: Performance Test ---");
+        Console.WriteLine("\n--- Example 6: TinyWorld Wrapper API ---");
+        EcsWorldExample.Run();
+
+        Console.WriteLine("\n--- Example 7: TinyApp Bevy-Style Wrapper API ---");
+        TinyAppExample.Run();
+
+        Console.WriteLine("\n--- Example 8: Auto-Registration (No Manual Registration) ---");
+        AutoRegistrationExample.Run();
+
+        Console.WriteLine("\n--- Example 9: Performance Test ---");
         PerformanceTest();
     }
 
     static void BasicEcsExample()
     {
-        // Create a new world
-        var world = tecs_world_new();
-        if (world.Handle == IntPtr.Zero)
-        {
-            Console.WriteLine("Failed to create world!");
-            return;
-        }
+        using var world = new TinyWorld();
 
-        try
-        {
-            // Register components
-            var positionId = RegisterComponent<Position>(world, "Position");
-            var velocityId = RegisterComponent<Velocity>(world, "Velocity");
+        // Register components
+        var positionId = world.RegisterComponent<Position>();
+        var velocityId = world.RegisterComponent<Velocity>();
 
-            Console.WriteLine($"Registered Position component: {positionId.Value}");
-            Console.WriteLine($"Registered Velocity component: {velocityId.Value}");
+        Console.WriteLine($"Registered Position component: {positionId.Id.Value}");
+        Console.WriteLine($"Registered Velocity component: {velocityId.Id.Value}");
 
-            // Create entities
-            var entity1 = tecs_entity_new(world);
-            var entity2 = tecs_entity_new(world);
+        // Create entities
+        var entity1 = world.Create();
+        var entity2 = world.Create();
 
-            Console.WriteLine($"\nCreated entity1: {entity1.Value} (index: {entity1.Index}, gen: {entity1.Generation})");
-            Console.WriteLine($"Created entity2: {entity2.Value} (index: {entity2.Index}, gen: {entity2.Generation})");
+        Console.WriteLine($"\nCreated entity1: {entity1}");
+        Console.WriteLine($"Created entity2: {entity2}");
 
-            // Add components to entities
-            var pos1 = new Position { X = 10.0f, Y = 20.0f };
-            var vel1 = new Velocity { X = 1.0f, Y = 2.0f };
+        // Add components to entities
+        world.Set(entity1, positionId, new Position { X = 10.0f, Y = 20.0f });
+        world.Set(entity1, velocityId, new Velocity { X = 1.0f, Y = 2.0f });
+        world.Set(entity2, positionId, new Position { X = 30.0f, Y = 40.0f });
 
-            Set(world, entity1, positionId, pos1);
-            Set(world, entity1, velocityId, vel1);
+        Console.WriteLine("\nAdded components to entities");
 
-            var pos2 = new Position { X = 30.0f, Y = 40.0f };
-            Set(world, entity2, positionId, pos2);
+        // Query components
+        ref var entity1Pos = ref world.Get(entity1, positionId);
+        ref var entity1Vel = ref world.Get(entity1, velocityId);
 
-            Console.WriteLine("\nAdded components to entities");
+        Console.WriteLine($"Entity1 Position: ({entity1Pos.X}, {entity1Pos.Y})");
+        Console.WriteLine($"Entity1 Velocity: ({entity1Vel.X}, {entity1Vel.Y})");
 
-            // Query components
-            var entity1Pos = Get<Position>(world, entity1, positionId);
-            var entity1Vel = Get<Velocity>(world, entity1, velocityId);
+        // Check component existence
+        var hasVelocity = world.Has(entity2, velocityId);
+        Console.WriteLine($"\nEntity2 has velocity: {hasVelocity}");
 
-            if (entity1Pos != null && entity1Vel != null)
-            {
-                Console.WriteLine($"Entity1 Position: ({entity1Pos->X}, {entity1Pos->Y})");
-                Console.WriteLine($"Entity1 Velocity: ({entity1Vel->X}, {entity1Vel->Y})");
-            }
+        // Update component
+        entity1Pos.X += 5.0f;
+        entity1Pos.Y += 5.0f;
+        Console.WriteLine($"Updated Entity1 Position: ({entity1Pos.X}, {entity1Pos.Y})");
 
-            // Check component existence
-            var hasVelocity = tecs_has(world, entity2, velocityId);
-            Console.WriteLine($"\nEntity2 has velocity: {hasVelocity}");
+        // World stats
+        Console.WriteLine($"\nWorld entity count: {world.Count}");
+        Console.WriteLine($"World tick: {world.Tick}");
 
-            // Update component
-            if (entity1Pos != null)
-            {
-                entity1Pos->X += 5.0f;
-                entity1Pos->Y += 5.0f;
-                Console.WriteLine($"Updated Entity1 Position: ({entity1Pos->X}, {entity1Pos->Y})");
-            }
+        // Delete an entity
+        world.Delete(entity2);
+        Console.WriteLine($"\nDeleted entity2");
+        Console.WriteLine($"Entity2 exists: {world.Exists(entity2)}");
+        Console.WriteLine($"Entity count after deletion: {world.Count}");
 
-            // World stats
-            var entityCount = tecs_world_entity_count(world);
-            var tick = tecs_world_tick(world);
-            Console.WriteLine($"\nWorld entity count: {entityCount}");
-            Console.WriteLine($"World tick: {tick.Value}");
-
-            // Delete an entity
-            tecs_entity_delete(world, entity2);
-            Console.WriteLine($"\nDeleted entity2");
-            Console.WriteLine($"Entity2 exists: {tecs_entity_exists(world, entity2)}");
-            Console.WriteLine($"Entity count after deletion: {tecs_world_entity_count(world)}");
-        }
-        finally
-        {
-            // Clean up
-            tecs_world_free(world);
-            Console.WriteLine("\nWorld cleaned up");
-        }
+        Console.WriteLine("\nWorld cleaned up");
     }
 
     static void QueryExample()
     {
-        // Create a new world
-        var world = tecs_world_new();
-        if (world.Handle == IntPtr.Zero)
+        using var world = new TinyWorld();
+
+        // Register components
+        var positionId = world.RegisterComponent<Position>();
+        var velocityId = world.RegisterComponent<Velocity>();
+
+        Console.WriteLine("Creating entities with components...");
+
+        // Create some entities with both Position and Velocity
+        for (int i = 0; i < 5; i++)
         {
-            Console.WriteLine("Failed to create world!");
-            return;
+            var entity = world.Create();
+            world.Set(entity, positionId, new Position { X = i * 10.0f, Y = i * 20.0f });
+            world.Set(entity, velocityId, new Velocity { X = 1.0f, Y = 2.0f });
         }
 
-        try
+        // Create some entities with only Position
+        for (int i = 0; i < 3; i++)
         {
-            // Register components
-            var positionId = RegisterComponent<Position>(world, "Position");
-            var velocityId = RegisterComponent<Velocity>(world, "Velocity");
-
-            Console.WriteLine("Creating entities with components...");
-
-            // Create some entities with both Position and Velocity
-            for (int i = 0; i < 5; i++)
-            {
-                var entity = tecs_entity_new(world);
-                var pos = new Position { X = i * 10.0f, Y = i * 20.0f };
-                var vel = new Velocity { X = 1.0f, Y = 2.0f };
-                Set(world, entity, positionId, pos);
-                Set(world, entity, velocityId, vel);
-            }
-
-            // Create some entities with only Position
-            for (int i = 0; i < 3; i++)
-            {
-                var entity = tecs_entity_new(world);
-                var pos = new Position { X = 100.0f + i, Y = 200.0f + i };
-                Set(world, entity, positionId, pos);
-            }
-
-            Console.WriteLine($"Created {tecs_world_entity_count(world)} entities");
-
-            // Build a query for entities with both Position and Velocity
-            Console.WriteLine("\nQuerying entities with Position AND Velocity:");
-            var query = tecs_query_new(world);
-            tecs_query_with(query, positionId);
-            tecs_query_with(query, velocityId);
-            tecs_query_build(query);
-
-            // Iterate through matching entities
-            QueryIter iter;
-            tecs_query_iter_init(&iter, query);
-            int matchCount = 0;
-            while (tecs_iter_next(&iter))
-            {
-                var count = tecs_iter_count(&iter);
-                var entities = tecs_iter_entities(&iter);
-                var positions = IterColumn<Position>(&iter, 0);
-                var velocities = IterColumn<Velocity>(&iter, 1);
-
-                for (int i = 0; i < count; i++)
-                {
-                    Console.WriteLine($"  Entity {entities[i].Value}: Pos({positions[i].X}, {positions[i].Y}), Vel({velocities[i].X}, {velocities[i].Y})");
-                    matchCount++;
-                }
-            }
-            Console.WriteLine($"Found {matchCount} entities with Position and Velocity");
-
-            // Free the query
-            tecs_query_free(query);
-
-            // Build another query for entities with Position but WITHOUT Velocity
-            Console.WriteLine("\nQuerying entities with Position but WITHOUT Velocity:");
-            var query2 = tecs_query_new(world);
-            tecs_query_with(query2, positionId);
-            tecs_query_without(query2, velocityId);
-            tecs_query_build(query2);
-
-            QueryIter iter2;
-            tecs_query_iter_init(&iter2, query2);
-            matchCount = 0;
-            while (tecs_iter_next(&iter2))
-            {
-                var count = tecs_iter_count(&iter2);
-                var entities = tecs_iter_entities(&iter2);
-                var positions = IterColumn<Position>(&iter2, 0);
-
-                for (int i = 0; i < count; i++)
-                {
-                    Console.WriteLine($"  Entity {entities[i].Value}: Pos({positions[i].X}, {positions[i].Y})");
-                    matchCount++;
-                }
-            }
-            Console.WriteLine($"Found {matchCount} entities with Position but no Velocity");
-
-            tecs_query_free(query2);
+            var entity = world.Create();
+            world.Set(entity, positionId, new Position { X = 100.0f + i, Y = 200.0f + i });
         }
-        finally
+
+        Console.WriteLine($"Created {world.Count} entities");
+
+        // Query entities with both Position and Velocity
+        Console.WriteLine("\nQuerying entities with Position AND Velocity:");
+        var query = world.Query()
+            .With(positionId)
+            .With(velocityId)
+            .Iter();
+
+        int matchCount = 0;
+        while (query.MoveNext())
         {
-            // Clean up
-            tecs_world_free(world);
-            Console.WriteLine("\nWorld cleaned up");
+            var positions = query.Column(positionId);
+            var velocities = query.Column(velocityId);
+
+            for (int i = 0; i < query.Count; i++)
+            {
+                Console.WriteLine($"  Entity {i}: Pos({positions[i].X}, {positions[i].Y}), Vel({velocities[i].X}, {velocities[i].Y})");
+                matchCount++;
+            }
         }
+        Console.WriteLine($"Found {matchCount} entities with Position and Velocity");
+
+        query.Dispose();
+
+        // Query entities with Position but WITHOUT Velocity
+        Console.WriteLine("\nQuerying entities with Position but WITHOUT Velocity:");
+        query = world.Query()
+            .With(positionId)
+            .Without(velocityId)
+            .Iter();
+
+        matchCount = 0;
+        while (query.MoveNext())
+        {
+            var positions = query.Column(positionId);
+
+            for (int i = 0; i < query.Count; i++)
+            {
+                Console.WriteLine($"  Entity {i}: Pos({positions[i].X}, {positions[i].Y})");
+                matchCount++;
+            }
+        }
+        Console.WriteLine($"Found {matchCount} entities with Position but no Velocity");
+
+        query.Dispose();
+
+        Console.WriteLine("\nWorld cleaned up");
     }
 
     static void StartupSystem(SystemContext* ctx, void* userData)
@@ -347,52 +310,38 @@ unsafe class Program
 
     static void ManagedComponentExample()
     {
-        var world = tecs_world_new();
+        using var world = new TinyWorld();
 
-        // Register managed components with custom storage
-        ManagedStorage.ManagedStorageProvider<Name>? nameStorage = null;
-        ManagedStorage.ManagedStorageProvider<Description>? descStorage = null;
+        // Register managed components
+        var nameId = world.RegisterComponent<Name>();
+        var descId = world.RegisterComponent<Description>();
 
-        try
+        Console.WriteLine($"Registered managed components: Name={nameId.Id.Value}, Description={descId.Id.Value}\n");
+
+        // Create entities
+        var player = world.Create();
+        var enemy = world.Create();
+
+        // Add managed components
+        world.Set(player, nameId, new Name { Value = "Hero" });
+        world.Set(player, descId, new Description
         {
-            var nameId = ManagedStorage.RegisterManagedComponent(world, "Name", out nameStorage);
-            var descId = ManagedStorage.RegisterManagedComponent(world, "Description", out descStorage);
+            Text = "The main character",
+            Tags = new List<string> { "player", "hero" }
+        });
+        world.Set(enemy, nameId, new Name { Value = "Goblin" });
 
-            Console.WriteLine($"Registered managed components: Name={nameId.Value}, Description={descId.Value}\n");
+        Console.WriteLine("✓ Added managed components\n");
 
-            // Create entities
-            var player = tecs_entity_new(world);
-            var enemy = tecs_entity_new(world);
+        // Get component reference
+        ref var retrievedName = ref world.Get(player, nameId);
+        Console.WriteLine($"✓ Retrieved via Get: {retrievedName.Value ?? "(null)"}");
 
-            var desc = new Description
-            {
-                Text = "The main character",
-                Tags = new List<string> { "player", "hero" }
-            };
-            // Add managed components
-            nameStorage.AddComponent(world, player, nameId, new Name { Value = "Hero" });
-            descStorage.AddComponent(world, player, descId, desc);
-
-            nameStorage.AddComponent(world, enemy, nameId, new Name { Value = "Goblin" });
-
-            Console.WriteLine("✓ Added managed components\n");
-
-            // Test GetComponent
-            ref var retrievedName = ref nameStorage.GetComponent(world, player, nameId);
-            Console.WriteLine($"✓ Retrieved via GetComponent: {retrievedName.Value ?? "(null)"}");
-
-            Console.WriteLine("=== Managed Components Benefits ===");
-            Console.WriteLine("✓ Single GCHandle per column");
-            Console.WriteLine("✓ No boxing/unboxing");
-            Console.WriteLine("✓ Direct object references");
-            Console.WriteLine("✓ Modify in place");
-        }
-        finally
-        {
-            nameStorage?.Dispose();
-            descStorage?.Dispose();
-            tecs_world_free(world);
-        }
+        Console.WriteLine("=== Managed Components Benefits ===");
+        Console.WriteLine("✓ Single GCHandle per column");
+        Console.WriteLine("✓ No boxing/unboxing");
+        Console.WriteLine("✓ Direct object references");
+        Console.WriteLine("✓ Modify in place");
     }
 
     static void PluggableStorageExample()
@@ -443,21 +392,16 @@ unsafe class Program
         }
     }
 
-    static void Setup(SystemContext* ctx, void* userData)
+    static void PerformanceSetupSystem(SystemContext* ctx, void* userData)
     {
-        const int COUNT = 524288 * 2;  // Reduced for testing span approach
+        const int COUNT = 524288 * 2;
 
         var commands = ctx->commands;
-        // tbevy_commands_init(&commands, ctx->app);
-        Console.WriteLine("commands {0}", (IntPtr)commands);
+        Console.WriteLine("Setting up {0} entities...", COUNT);
 
-        var posId = ComponentStorage.GetComponentId<Position>(ctx->world);
-        var velId = ComponentStorage.GetComponentId<Velocity>(ctx->world);
-        var nameId = ComponentStorage.GetComponentId<Name>(ctx->world);
-
-        Console.WriteLine("posId {0}", posId.Value);
-        Console.WriteLine("velId {0}", velId.Value);
-        Console.WriteLine("nameId {0}", nameId.Value);
+        var posId = PerformanceTestState.PositionId.Id;
+        var velId = PerformanceTestState.VelocityId.Id;
+        var nameId = PerformanceTestState.NameId.Id;
 
         for (int i = 0; i < COUNT; i++)
         {
@@ -468,10 +412,8 @@ unsafe class Program
         }
 
         tbevy_commands_apply(commands);
-
-        Console.WriteLine("Setup completed");
+        Console.WriteLine("Setup completed - {0} entities created", COUNT);
     }
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static Span<T> Column<T>(QueryIter* iter, int columnIndex) where T : notnull
@@ -486,44 +428,28 @@ unsafe class Program
         return new Span<T>(ptr, count);
     }
 
-    static void Performance(SystemContext* ctx, void* userData)
+    static void PerformanceUpdateSystem(SystemContext* ctx, void* userData)
     {
-        var posId = ComponentStorage.GetComponentId<Position>(ctx->world);
-        var velId = ComponentStorage.GetComponentId<Velocity>(ctx->world);
-        var nameId = ComponentStorage.GetComponentId<Name>(ctx->world);
+        var posId = PerformanceTestState.PositionId.Id;
+        var velId = PerformanceTestState.VelocityId.Id;
 
         var query = tecs_query_new(ctx->world);
         tecs_query_with(query, posId);
         tecs_query_with(query, velId);
-        tecs_query_with(query, nameId);
         tecs_query_build(query);
 
-        // QueryIter iter;
-        // tecs_query_iter_init(&iter, query);
         var iter = tecs_query_iter_cached(query);
 
-        // // var worldTick = tecs_world_tick(ctx->world);
         while (tecs_iter_next(iter))
         {
             var count = tecs_iter_count(iter);
             var pos = Column<Position>(iter, 0);
             var vel = Column<Velocity>(iter, 1);
-            var name = Column<Name>(iter, 2);
-
-            // var velChangedTicks = tecs_iter_changed_ticks(&iter, 1);
 
             for (var i = 0; i < count; ++i)
             {
-                // span0[i].X *= span1[i].X;
-                // span0[i].Y *= span1[i].Y;
-                // if (velChangedTicks[i].Value < worldTick.Value)
-                // {
-                //     continue;
-                // }
                 pos[i].X *= vel[i].X;
                 pos[i].Y *= vel[i].Y;
-                ref var n = ref name[i];
-                // n.Value = $"Updated_{n.Value}";
             }
         }
 
@@ -532,25 +458,34 @@ unsafe class Program
 
     static void PerformanceTest()
     {
-        var app = tbevy_app_new(ThreadingMode.SingleThreaded);
-        var world = tbevy_app_world(app);
+        using var app = new TinyApp(ThreadingMode.SingleThreaded);
 
-        ComponentStorage.Register<Position>(world);
-        ComponentStorage.Register<Velocity>(world);
-        ComponentStorage.Register<Name>(world);
+        // Register components
+        var posId = app.World.RegisterComponent<Position>();
+        var velId = app.World.RegisterComponent<Velocity>();
+        var nameId = app.World.RegisterComponent<Name>();
 
-        var stageStartup = tbevy_stage_default(StageId.Startup);
-        var stageUpdate = tbevy_stage_default(StageId.Update);
+        // Store component IDs for systems to use
+        PerformanceTestState.PositionId = posId;
+        PerformanceTestState.VelocityId = velId;
+        PerformanceTestState.NameId = nameId;
 
-        var builder = tbevy_app_add_system(app, Setup, null);
-        builder = tbevy_system_in_stage(builder, stageStartup);
-        tbevy_system_build(builder);
+        // Add setup system to startup stage
+        var setupDelegate = new SystemFunction(PerformanceSetupSystem);
+        app.AddSystem(setupDelegate, null)
+            .InStage(Stages.Startup)
+            .Build();
 
-        builder = tbevy_app_add_system(app, Performance, null);
-        builder = tbevy_system_in_stage(builder, stageUpdate);
-        tbevy_system_build(builder);
+        // Add performance system to update stage
+        var perfDelegate = new SystemFunction(PerformanceUpdateSystem);
+        app.AddSystem(perfDelegate, null)
+            .InStage(Stages.Update)
+            .Build();
 
+        // Run startup once
+        app.RunStartup();
 
+        // Benchmark update loop
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var current = 0L;
         var last = 0L;
@@ -558,16 +493,21 @@ unsafe class Program
         for (var i = 0; i < 50; ++i)
         {
             for (var j = 0; j < 3600; ++j)
-                tbevy_app_update(app);
+                app.Update();
 
             var elapsed = sw.ElapsedMilliseconds;
             last = current;
             current = elapsed;
             Console.WriteLine($"Iteration {i}: {current - last} ms");
         }
-
-        tbevy_app_free(app);
     }
+}
+
+static class PerformanceTestState
+{
+    public static ComponentId<Position> PositionId;
+    public static ComponentId<Velocity> VelocityId;
+    public static ComponentId<Name> NameId;
 }
 
 static class ComponentStorage

@@ -343,29 +343,6 @@ public static unsafe class ManagedStorage
             storage.Swap(idxA, idxB);
         }
 
-        /// <summary>
-        /// Add a managed component to an entity.
-        /// The object reference is stored directly in the pinned array - no boxing or GCHandles per component!
-        /// </summary>
-        public void AddComponent(TinyEcs.World world, TinyEcs.Entity entity, TinyEcs.ComponentId componentId, T? value)
-        {
-            // We need to pass a pointer to the object reference
-            // Create a stack variable to hold the reference and get its address
-            void* ptr = Unsafe.AsPointer(ref value);
-            TinyEcs.tecs_set(world, entity, componentId, ptr, IntPtr.Size);
-        }
-
-        /// <summary>
-        /// Get a managed component from an entity.
-        /// Uses the pointer ID mapping created by GetPtr.
-        /// </summary>
-        public ref T? GetComponent(TinyEcs.World world, TinyEcs.Entity entity, TinyEcs.ComponentId componentId)
-        {
-            // Call tecs_get which will invoke our GetPtr callback
-            var ptr = TinyEcs.tecs_get(world, entity, componentId);
-            return ref Unsafe.AsRef<T?>(ptr);
-        }
-
         public void Dispose()
         {
             if (!_disposed)
