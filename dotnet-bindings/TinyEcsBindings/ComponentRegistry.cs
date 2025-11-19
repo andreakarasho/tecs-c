@@ -188,6 +188,17 @@ public static class QueryBuilderExtensions
         var componentId = world.Component<T>();
         return builder.Added(componentId);
     }
+
+    /// <summary>
+    /// Build the query and create a typed data iterator (Bevy-style).
+    /// </summary>
+    public static TData Build<TData>(this QueryBuilder builder)
+        where TData : struct, Bevy.IData<TData>, allows ref struct
+    {
+        TData.Build(builder.World);
+        var iterator = builder.Iter();
+        return TData.CreateIterator(iterator);
+    }
 }
 
 /// <summary>
@@ -197,28 +208,31 @@ public static class QueryIteratorExtensions
 {
     /// <summary>
     /// Get a span of components for the current chunk (auto-registers if needed).
+    /// Uses the iterator's world reference automatically.
     /// </summary>
-    public static Span<T> Column<T>(this QueryIterator iterator, TinyWorld world) where T : struct
+    public static Span<T> Column<T>(this QueryIterator iterator) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = iterator.World.Component<T>();
         return iterator.Column(componentId);
     }
 
     /// <summary>
     /// Get the changed ticks for a component column (auto-registers if needed).
+    /// Uses the iterator's world reference automatically.
     /// </summary>
-    public static ReadOnlySpan<TinyEcs.Tick> ChangedTicks<T>(this QueryIterator iterator, TinyWorld world) where T : struct
+    public static ReadOnlySpan<TinyEcs.Tick> ChangedTicks<T>(this QueryIterator iterator) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = iterator.World.Component<T>();
         return iterator.ChangedTicks(componentId);
     }
 
     /// <summary>
     /// Get the added ticks for a component column (auto-registers if needed).
+    /// Uses the iterator's world reference automatically.
     /// </summary>
-    public static ReadOnlySpan<TinyEcs.Tick> AddedTicks<T>(this QueryIterator iterator, TinyWorld world) where T : struct
+    public static ReadOnlySpan<TinyEcs.Tick> AddedTicks<T>(this QueryIterator iterator) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = iterator.World.Component<T>();
         return iterator.AddedTicks(componentId);
     }
 }

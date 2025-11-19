@@ -58,7 +58,7 @@ public static class AutoRegistrationExample
         int count = 0;
         while (query.MoveNext())
         {
-            var positions = query.Column<Position>(world);
+            var positions = query.Column<Position>();
 
             for (int i = 0; i < query.Count; i++)
             {
@@ -80,7 +80,7 @@ public static class AutoRegistrationExample
         count = 0;
         while (query.MoveNext())
         {
-            var positions = query.Column<Position>(world);
+            var positions = query.Column<Position>();
 
             for (int i = 0; i < query.Count; i++)
             {

@@ -1,0 +1,106 @@
+<#@ template language="C#" #>
+<#@ output extension=".g.cs" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Linq" #>
+#pragma warning disable 1591
+#nullable enable
+
+using System;
+using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
+
+namespace TinyEcsBindings.Bevy
+{
+<#
+    const int MaxTypeParams = 8;
+
+    // Generate And<T1, T2, ...> filter combinators
+    for (int count = 2; count <= MaxTypeParams; count++)
+    {
+        var typeParams = string.Join(", ", Enumerable.Range(0, count).Select(i => $"TFilter{i}"));
+        var whereConstraints = string.Join("\r\n        ", Enumerable.Range(0, count).Select(i => $"where TFilter{i} : struct, IFilter<TFilter{i}>, allows ref struct"));
+#>
+    /// <summary>
+    /// Combine <#= count #> filters with AND logic
+    /// </summary>
+    [SkipLocalsInit]
+    public ref struct And<<#= typeParams #>> : IFilter<And<<#= typeParams #>>>
+        <#= whereConstraints #>
+    {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+        private TFilter<#= i #> _filter<#= i #>;
+<#
+        }
+#>
+
+        internal And(QueryIterator iterator)
+        {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            _filter<#= i #> = TFilter<#= i #>.CreateIterator(iterator);
+<#
+        }
+#>
+        }
+
+        public static void Build(TinyWorld world)
+        {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            TFilter<#= i #>.Build(world);
+<#
+        }
+#>
+        }
+
+        public static And<<#= typeParams #>> CreateIterator(QueryIterator iterator)
+            => new And<<#= typeParams #>>(iterator);
+
+        [UnscopedRef]
+        public ref And<<#= typeParams #>> Current
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ref this;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool MoveNext()
+        {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            if (!_filter<#= i #>.MoveNext()) return false;
+<#
+        }
+#>
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly And<<#= typeParams #>> GetEnumerator() => this;
+
+        public void SetTicks(ulong lastRun, ulong thisRun)
+        {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            _filter<#= i #>.SetTicks(lastRun, thisRun);
+<#
+        }
+#>
+        }
+    }
+
+<#
+    }
+#>
+}

@@ -130,7 +130,7 @@ public sealed unsafe partial class TinyWorld : IDisposable
     /// </summary>
     public QueryBuilder Query()
     {
-        return new QueryBuilder(_world);
+        return new QueryBuilder(_world, this);
     }
 
     /// <summary>
@@ -197,11 +197,18 @@ public readonly struct ComponentId<T> where T : struct
 public readonly unsafe ref struct QueryBuilder
 {
     private readonly TinyEcs.Query _query;
+    private readonly TinyWorld _world;
 
-    internal QueryBuilder(TinyEcs.World world)
+    internal QueryBuilder(TinyEcs.World world, TinyWorld tinyWorld)
     {
         _query = TinyEcs.tecs_query_new(world);
+        _world = tinyWorld;
     }
+
+    /// <summary>
+    /// Get the TinyWorld associated with this query builder.
+    /// </summary>
+    public readonly TinyWorld World => _world;
 
     /// <summary>
     /// Add a required component to the query.
@@ -255,7 +262,7 @@ public readonly unsafe ref struct QueryBuilder
     {
         TinyEcs.tecs_query_build(_query);
         var iter = TinyEcs.tecs_query_iter(_query);
-        return new QueryIterator(iter, _query);
+        return new QueryIterator(iter, _query, _world);
     }
 
     /// <summary>
@@ -274,12 +281,19 @@ public readonly unsafe ref struct QueryIterator
 {
     private readonly TinyEcs.QueryIter* _iter;
     private readonly TinyEcs.Query _query;
+    private readonly TinyWorld _world;
 
-    internal QueryIterator(TinyEcs.QueryIter* iter, TinyEcs.Query query)
+    internal QueryIterator(TinyEcs.QueryIter* iter, TinyEcs.Query query, TinyWorld world)
     {
         _iter = iter;
         _query = query;
+        _world = world;
     }
+
+    /// <summary>
+    /// Get the world reference for this iterator.
+    /// </summary>
+    public readonly TinyWorld World => _world;
 
     /// <summary>
     /// Get the number of entities in the current chunk.

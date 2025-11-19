@@ -82,7 +82,10 @@ unsafe class Program
         Console.WriteLine("\n--- Example 8: Auto-Registration (No Manual Registration) ---");
         AutoRegistrationExample.Run();
 
-        Console.WriteLine("\n--- Example 9: Performance Test ---");
+        Console.WriteLine("\n--- Example 9: Bevy-Style Query API ---");
+        BevyQueryExample.Run();
+
+        Console.WriteLine("\n--- Example 10: Performance Test ---");
         PerformanceTest();
     }
 
@@ -508,50 +511,4 @@ static class PerformanceTestState
     public static ComponentId<Position> PositionId;
     public static ComponentId<Velocity> VelocityId;
     public static ComponentId<Name> NameId;
-}
-
-static class ComponentStorage
-{
-    private static readonly Dictionary<IntPtr, Dictionary<Type, ComponentId>> _components = new();
-    private static readonly Dictionary<IntPtr, Dictionary<Type, object>> _storageProviders = new();
-
-    public static void Register<T>(World world) where T : notnull
-    {
-        if (!_components.ContainsKey(world.Handle))
-            _components[world.Handle] = new();
-
-        if (!_storageProviders.ContainsKey(world.Handle))
-            _storageProviders[world.Handle] = new();
-
-        var name = typeof(T).ToString();
-        if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-        {
-            RegisterManagedComponent<T>(world, name);
-        }
-        else
-        {
-            RegisterUnamanged<T>(world, name);
-        }
-    }
-
-    private static void RegisterUnamanged<T>(World world, string name) where T : notnull
-    {
-        var id = RegisterComponent<T>(world, name);
-        _components[world.Handle][typeof(T)] = id;
-    }
-
-    private static void RegisterManagedComponent<T>(World world, string name) where T : notnull
-    {
-        var id = ManagedStorage.RegisterManagedComponent<T>(world, name, out var provider);
-        _components[world.Handle][typeof(T)] = id;
-        _storageProviders[world.Handle][typeof(T)] = provider; // Keep provider alive!
-    }
-
-    public static ComponentId GetComponentId<T>(World world)
-    {
-        var type = typeof(T);
-        if (_components.TryGetValue(world.Handle, out var componentIds))
-            return componentIds[type];
-        throw new ArgumentException($"Component {type} is not registered.");
-    }
 }

@@ -1,0 +1,178 @@
+<#@ template language="C#" #>
+<#@ output extension=".g.cs" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Linq" #>
+#pragma warning disable 1591
+#nullable enable
+
+using System;
+using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
+
+namespace TinyEcsBindings.Bevy
+{
+<#
+    const int MaxTypeParams = 8;
+
+    for (int count = 1; count <= MaxTypeParams; count++)
+    {
+        var typeParams = string.Join(", ", Enumerable.Range(0, count).Select(i => $"T{i}"));
+        var whereConstraints = string.Join(" ", Enumerable.Range(0, count).Select(i => $"where T{i} : struct"));
+#>
+    /// <summary>
+    /// Query data for <#= count #> component<#= count > 1 ? "s" : "" #>
+    /// </summary>
+    [SkipLocalsInit]
+    public ref struct Data<<#= typeParams #>> : IData<Data<<#= typeParams #>>>
+        <#= whereConstraints #>
+    {
+        private QueryIterator _iterator;
+        private int _index, _count;
+        private ReadOnlySpan<Entity> _entities;
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+        private Span<T<#= i #>> _column<#= i #>;
+<#
+        }
+#>
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal Data(QueryIterator iterator)
+        {
+            _iterator = iterator;
+            _index = -1;
+            _count = -1;
+            _entities = default;
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            _column<#= i #> = default;
+<#
+        }
+#>
+        }
+
+        public static void Build(TinyWorld world)
+        {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            world.Component<T<#= i #>>();
+<#
+        }
+#>
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Data<<#= typeParams #>> CreateIterator(QueryIterator iterator)
+            => new Data<<#= typeParams #>>(iterator);
+
+        [UnscopedRef]
+        public ref Data<<#= typeParams #>> Current
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ref this;
+        }
+
+        /// <summary>
+        /// Deconstruct into component refs (per-entity access)
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly void Deconstruct(<#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Ref<T{i}> c{i}")) #>)
+        {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            c<#= i #> = new Ref<T<#= i #>>(ref _column<#= i #>[_index]);
+<#
+        }
+#>
+        }
+
+        /// <summary>
+        /// Deconstruct into component spans (chunk access)
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly void DeconstructSpans(<#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Span<T{i}> c{i}")) #>)
+        {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            c<#= i #> = _column<#= i #>;
+<#
+        }
+#>
+        }
+
+        /// <summary>
+        /// Deconstruct into entities and component spans
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly void Deconstruct(out ReadOnlySpan<Entity> entities, <#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Span<T{i}> c{i}")) #>)
+        {
+            entities = _entities;
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+            c<#= i #> = _column<#= i #>;
+<#
+        }
+#>
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool MoveNext()
+        {
+            if (++_index >= _count)
+            {
+                if (!_iterator.MoveNext())
+                    return false;
+
+                _index = 0;
+                _count = _iterator.Count;
+                _entities = _iterator.Entities;
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+                _column<#= i #> = _iterator.Column<T<#= i #>>();
+<#
+        }
+#>
+            }
+
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly Data<<#= typeParams #>> GetEnumerator() => this;
+
+        /// <summary>
+        /// Get entity at current index
+        /// </summary>
+        public readonly Entity Entity => _entities[_index];
+
+        /// <summary>
+        /// Get component reference at current index
+        /// </summary>
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+        public readonly ref T<#= i #> Item<#= i #> => ref _column<#= i #>[_index];
+<#
+        }
+#>
+    }
+
+<#
+    }
+#>
+}
