@@ -1,0 +1,140 @@
+<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".g.cs" #>
+<#
+    const int MaxParams = 8;
+#>
+using System;
+
+namespace TinyEcsBindings.Bevy;
+
+/// <summary>
+/// Generated observer extension methods with system parameters.
+/// Observers can request system parameters just like regular systems.
+/// </summary>
+public static class ObserverSystemExtensions
+{
+<# for (int i = 1; i <= MaxParams; i++) { #>
+<# var typeParams = string.Join(", ", Enumerable.Range(0, i).Select(n => $"T{n}")); #>
+<# var paramConstraints = string.Join("\n        ", Enumerable.Range(0, i).Select(n => $"where T{n} : ISystemParam, new()")); #>
+<# var paramList = string.Join(", ", Enumerable.Range(0, i).Select(n => $"T{n} p{n}")); #>
+    /// <summary>
+    /// Register an observer with <#= i #> system parameter(s).
+    /// Example: app.AddObserver((On&lt;Player, Added&gt; trigger, Query&lt;Health&gt; query) =&gt; { ... });
+    /// </summary>
+    public static App AddObserver<TComponent, TEvent, <#= typeParams #>>(
+        this App app,
+        Action<On<TComponent, TEvent>, <#= typeParams #>> callback)
+        where TComponent : struct
+        where TEvent : struct, IObserverEvent
+        <#= paramConstraints #>
+    {
+        var parameters = new ISystemParam[] { <#= string.Join(", ", Enumerable.Range(0, i).Select(n => $"new T{n}()")) #> };
+        return app.AddObserverInternal(new ObserverWithParams<TComponent, TEvent, <#= typeParams #>>(callback, parameters));
+    }
+
+    /// <summary>
+    /// Register an observer that matches all events with <#= i #> system parameter(s).
+    /// Example: app.AddObserver((On&lt;Player&gt; trigger, Commands commands) =&gt; { ... });
+    /// </summary>
+    public static App AddObserver<TComponent, <#= typeParams #>>(
+        this App app,
+        Action<On<TComponent>, <#= typeParams #>> callback)
+        where TComponent : struct
+        <#= paramConstraints #>
+    {
+        var parameters = new ISystemParam[] { <#= string.Join(", ", Enumerable.Range(0, i).Select(n => $"new T{n}()")) #> };
+        return app.AddObserverInternal(new ObserverAnyWithParams<TComponent, <#= typeParams #>>(callback, parameters));
+    }
+
+<# } #>
+}
+
+// Internal observer implementations with system parameters
+<# for (int i = 1; i <= MaxParams; i++) { #>
+<# var typeParams = string.Join(", ", Enumerable.Range(0, i).Select(n => $"T{n}")); #>
+<# var paramConstraints = string.Join("\n    ", Enumerable.Range(0, i).Select(n => $"where T{n} : ISystemParam, new()")); #>
+<# var paramList = string.Join(", ", Enumerable.Range(0, i).Select(n => $"p{n}")); #>
+<# var paramCast = string.Join(", ", Enumerable.Range(0, i).Select(n => $"(T{n})_parameters[{n}]")); #>
+
+internal sealed class ObserverWithParams<TComponent, TEvent, <#= typeParams #>> : IObserver
+    where TComponent : struct
+    where TEvent : struct, IObserverEvent
+    <#= paramConstraints #>
+{
+    private readonly Action<On<TComponent, TEvent>, <#= typeParams #>> _callback;
+    private readonly ISystemParam[] _parameters;
+
+    public ObserverWithParams(Action<On<TComponent, TEvent>, <#= typeParams #>> callback, ISystemParam[] parameters)
+    {
+        _callback = callback;
+        _parameters = parameters;
+    }
+
+    public Type ComponentType => typeof(TComponent);
+    public Type EventType => typeof(TEvent);
+
+    public void Trigger(TinyWorld world, ObserverTrigger trigger)
+    {
+        // Initialize and fetch parameters
+        foreach (var param in _parameters)
+        {
+            param.Initialize(world);
+            param.Fetch(world);
+        }
+
+        // Get component data
+        var componentId = world.Component<TComponent>();
+        TComponent component = default;
+        if (world.Has(trigger.Entity, componentId))
+        {
+            component = world.Get<TComponent>(trigger.Entity, componentId);
+        }
+
+        var on = new On<TComponent, TEvent>(trigger.Entity, component);
+        _callback(on, <#= paramCast #>);
+    }
+}
+
+internal sealed class ObserverAnyWithParams<TComponent, <#= typeParams #>> : IObserver
+    where TComponent : struct
+    <#= paramConstraints #>
+{
+    private readonly Action<On<TComponent>, <#= typeParams #>> _callback;
+    private readonly ISystemParam[] _parameters;
+
+    public ObserverAnyWithParams(Action<On<TComponent>, <#= typeParams #>> callback, ISystemParam[] parameters)
+    {
+        _callback = callback;
+        _parameters = parameters;
+    }
+
+    public Type ComponentType => typeof(TComponent);
+    public Type EventType => typeof(Any);
+
+    public void Trigger(TinyWorld world, ObserverTrigger trigger)
+    {
+        // Initialize and fetch parameters
+        foreach (var param in _parameters)
+        {
+            param.Initialize(world);
+            param.Fetch(world);
+        }
+
+        // Get component data
+        var componentId = world.Component<TComponent>();
+        TComponent component = default;
+        if (world.Has(trigger.Entity, componentId))
+        {
+            component = world.Get<TComponent>(trigger.Entity, componentId);
+        }
+
+        var on = new On<TComponent>(trigger.Entity, component);
+        _callback(on, <#= paramCast #>);
+    }
+}
+
+<# } #>

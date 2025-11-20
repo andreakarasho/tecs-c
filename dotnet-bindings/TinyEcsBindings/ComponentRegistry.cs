@@ -147,45 +147,45 @@ public static class QueryBuilderExtensions
     /// <summary>
     /// Add a required component to the query (auto-registers if needed).
     /// </summary>
-    public static QueryBuilder With<T>(this QueryBuilder builder, TinyWorld world) where T : struct
+    public static QueryBuilder With<T>(this QueryBuilder builder) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = builder.World.Component<T>();
         return builder.With(componentId);
     }
 
     /// <summary>
     /// Add an excluded component to the query (auto-registers if needed).
     /// </summary>
-    public static QueryBuilder Without<T>(this QueryBuilder builder, TinyWorld world) where T : struct
+    public static QueryBuilder Without<T>(this QueryBuilder builder) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = builder.World.Component<T>();
         return builder.Without(componentId);
     }
 
     /// <summary>
     /// Add an optional component to the query (auto-registers if needed).
     /// </summary>
-    public static QueryBuilder Optional<T>(this QueryBuilder builder, TinyWorld world) where T : struct
+    public static QueryBuilder Optional<T>(this QueryBuilder builder) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = builder.World.Component<T>();
         return builder.Optional(componentId);
     }
 
     /// <summary>
     /// Filter for components that have been changed since the last query (auto-registers if needed).
     /// </summary>
-    public static QueryBuilder Changed<T>(this QueryBuilder builder, TinyWorld world) where T : struct
+    public static QueryBuilder Changed<T>(this QueryBuilder builder) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = builder.World.Component<T>();
         return builder.Changed(componentId);
     }
 
     /// <summary>
     /// Filter for components that have been added since the last query (auto-registers if needed).
     /// </summary>
-    public static QueryBuilder Added<T>(this QueryBuilder builder, TinyWorld world) where T : struct
+    public static QueryBuilder Added<T>(this QueryBuilder builder) where T : struct
     {
-        var componentId = world.Component<T>();
+        var componentId = builder.World.Component<T>();
         return builder.Added(componentId);
     }
 
@@ -195,7 +195,7 @@ public static class QueryBuilderExtensions
     public static TData Build<TData>(this QueryBuilder builder)
         where TData : struct, Bevy.IData<TData>, allows ref struct
     {
-        TData.Build(builder.World);
+        TData.Build(builder);
         var iterator = builder.Iter();
         return TData.CreateIterator(iterator);
     }

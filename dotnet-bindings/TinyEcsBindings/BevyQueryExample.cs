@@ -3,31 +3,79 @@ using TinyEcsBindings.Bevy;
 
 namespace TinyEcsBindings;
 
+/// <summary>
+/// Example demonstrating the Bevy-style ECS system parameter API.
+/// Shows Query, Commands, Res/ResMut, filters, and the App scheduler.
+/// </summary>
 public static class BevyQueryExample
 {
+    // Example components
+    public struct Position { public float X, Y; }
+    public struct Velocity { public float X, Y; }
+    public struct Health { public int Current, Max; }
+    public struct Enemy { }
+
+    // Example resource
+    public class Time
+    {
+        public float DeltaTime { get; set; } = 0.016f;
+        public float TotalTime { get; set; }
+    }
+
     public static void Run()
     {
-        Console.WriteLine("=== Bevy-Style Query API Example ===\n");
+        Console.WriteLine("=== Bevy-Style System Parameter API Example ===\n");
 
-        using var world = new TinyWorld();
+        var world = new TinyWorld();
+        var app = new App(world);
+
+        // Insert resources
+        world.SetResource(new Time());
+
+        // Add startup systems
+        app.AddSystemToStage("Startup", SystemAdapters.Create<Commands>(SpawnEntities));
+
+        // Add update systems with dependency injection
+        var movementSystem = SystemAdapters.Create<Query<Data<Position, Velocity>>, Res<Time>>(MovementSystem);
+        var printSystem = SystemAdapters.Create<Query<Data<Position>>>(PrintPositions);
+
+        app.AddSystem(movementSystem)
+            .Label("movement");
+
+        app.AddSystem(printSystem)
+            .After(movementSystem);
+
+        // Run startup
+        app.RunStartup();
+
+        // Run a few frames
+        Console.WriteLine("\nRunning 3 frames...");
+        for (int frame = 0; frame < 3; frame++)
+        {
+            app.Update();
+        }
+
+        Console.WriteLine("\n=== Old-Style Direct Query API Example ===\n");
+
+        using var world2 = new TinyWorld();
 
         // Create some entities
-        var player = world.Create();
-        var enemy1 = world.Create();
-        var enemy2 = world.Create();
-        var obstacle = world.Create(); // Only has Position, no Velocity
+        var player = world2.Create();
+        var enemy1 = world2.Create();
+        var enemy2 = world2.Create();
+        var obstacle = world2.Create(); // Only has Position, no Velocity
 
         // Set components using auto-registration
-        world.Set(player, new Position { X = 10.0f, Y = 20.0f });
-        world.Set(player, new Velocity { X = 1.0f, Y = 0.5f });
+        world2.Set(player, new Position { X = 10.0f, Y = 20.0f });
+        world2.Set(player, new Velocity { X = 1.0f, Y = 0.5f });
 
-        world.Set(enemy1, new Position { X = 50.0f, Y = 30.0f });
-        world.Set(enemy1, new Velocity { X = -0.5f, Y = 0.3f });
+        world2.Set(enemy1, new Position { X = 50.0f, Y = 30.0f });
+        world2.Set(enemy1, new Velocity { X = -0.5f, Y = 0.3f });
 
-        world.Set(enemy2, new Position { X = 80.0f, Y = 10.0f });
-        world.Set(enemy2, new Velocity { X = -0.8f, Y = -0.2f });
+        world2.Set(enemy2, new Position { X = 80.0f, Y = 10.0f });
+        world2.Set(enemy2, new Velocity { X = -0.8f, Y = -0.2f });
 
-        world.Set(obstacle, new Position { X = 40.0f, Y = 40.0f });
+        world2.Set(obstacle, new Position { X = 40.0f, Y = 40.0f });
         // No velocity for obstacle!
 
         Console.WriteLine("Created 4 entities:");
@@ -35,13 +83,13 @@ public static class BevyQueryExample
         Console.WriteLine("- 2 enemies (Position + Velocity)");
         Console.WriteLine("- 1 obstacle (Position only)\n");
 
-        // Query using Bevy-style API - manual iteration
+        // Query using direct API - manual iteration
         Console.WriteLine("=== Manual Query Iteration ===");
         Console.WriteLine("Entities with Position AND Velocity:");
 
-        var query = world.Query()
-            .With<Position>(world)
-            .With<Velocity>(world)
+        var query = world2.Query()
+            .With<Position>()
+            .With<Velocity>()
             .Iter();
 
         int count = 0;
@@ -59,104 +107,50 @@ public static class BevyQueryExample
             }
         }
 
-        Console.WriteLine($"Found {count} moving entities\n");
+        Console.WriteLine($"Found {count} moving entities");
         query.Dispose();
+    }
 
-        // Demonstrate chunk-based processing (Bevy-style)
-        Console.WriteLine("=== Bevy-Style Chunk Processing ===");
-        Console.WriteLine("Applying velocity to positions:");
+    // System functions for the Bevy-style API
+    private static void SpawnEntities(Commands commands)
+    {
+        Console.WriteLine("Spawning entities...");
 
-        query = world.Query()
-            .With<Position>(world)
-            .With<Velocity>(world)
-            .Iter();
-
-        while (query.MoveNext())
+        for (int i = 0; i < 3; i++)
         {
-            var positions = query.Column<Position>();
-            var velocities = query.Column<Velocity>();
-
-            // Process entire chunk at once (SIMD-friendly pattern)
-            for (int i = 0; i < query.Count; i++)
-            {
-                positions[i].X += velocities[i].X;
-                positions[i].Y += velocities[i].Y;
-            }
+            commands.Spawn()
+                .Insert(new Position { X = i * 10f, Y = 0f })
+                .Insert(new Velocity { X = 1f, Y = 0.5f });
         }
 
-        query.Dispose();
+        Console.WriteLine("Spawned 3 entities with Position and Velocity");
+    }
 
-        Console.WriteLine("Updated positions:");
+    private static void MovementSystem(Query<Data<Position, Velocity>> query, Res<Time> time)
+    {
+        var deltaTime = time.Value.DeltaTime;
 
-        query = world.Query()
-            .With<Position>(world)
-            .With<Velocity>(world)
-            .Iter();
-
-        while (query.MoveNext())
+        foreach (var data in query.Iter())
         {
-            var positions = query.Column<Position>();
-            var entities = query.Entities;
-
-            for (int i = 0; i < query.Count; i++)
-            {
-                Console.WriteLine($"  Entity {entities[i].Raw}: Pos({positions[i].X:F1}, {positions[i].Y:F1})");
-            }
-        }
-
-        query.Dispose();
-
-        // Demonstrate new Ref<T> API for per-entity access
-        Console.WriteLine("\n=== Ref<T> Per-Entity Access ===");
-        Console.WriteLine("Using Data<T> deconstruction for per-entity refs:");
-
-        var dataQuery = world.Query()
-            .With<Position>(world)
-            .With<Velocity>(world)
-            .Build<Data<Position, Velocity>>();
-
-        foreach (var data in dataQuery)
-        {
-            // Deconstruct into Ref<T> for per-entity access
             var (pos, vel) = data;
-
-            Console.WriteLine($"  Entity {data.Entity.Raw}: " +
-                            $"Pos({pos.Value.X:F1}, {pos.Value.Y:F1}), " +
-                            $"Vel({vel.Value.X:F2}, {vel.Value.Y:F2})");
-
-            // Can modify through ref
-            pos.Value.X += vel.Value.X * 2.0f;
-            pos.Value.Y += vel.Value.Y * 2.0f;
+            pos.Ref.X += vel.Ref.X * deltaTime;
+            pos.Ref.Y += vel.Ref.Y * deltaTime;
         }
+    }
 
-        Console.WriteLine("\n=== DeconstructSpans for Chunk Access ===");
-        Console.WriteLine("Using DeconstructSpans for chunk-based processing:");
-
-        dataQuery = world.Query()
-            .With<Position>(world)
-            .With<Velocity>(world)
-            .Build<Data<Position, Velocity>>();
-
-        foreach (var data in dataQuery)
+    private static void PrintPositions(Query<Data<Position>> query)
+    {
+        int count = 0;
+        foreach (var data in query.Iter())
         {
-            // Deconstruct into Span<T> for chunk access
-            data.DeconstructSpans(out var positions, out var velocities);
-
-            Console.WriteLine($"  Processing chunk of {positions.Length} entities");
-
-            // SIMD-friendly chunk processing
-            for (int i = 0; i < positions.Length; i++)
-            {
-                positions[i].X += velocities[i].X;
-                positions[i].Y += velocities[i].Y;
-            }
+            data.Deconstruct(out var pos);
+            Console.WriteLine($"  Position({pos.Ref.X:F2}, {pos.Ref.Y:F2})");
+            count++;
         }
 
-        Console.WriteLine("\n✓ Bevy-style chunk-based iteration working!");
-        Console.WriteLine("✓ Auto-registration of components");
-        Console.WriteLine("✓ Type-safe, zero-allocation queries");
-        Console.WriteLine("✓ SIMD-friendly data layout");
-        Console.WriteLine("✓ Ref<T> per-entity access");
-        Console.WriteLine("✓ DeconstructSpans chunk access");
+        if (count == 0)
+        {
+            Console.WriteLine("  (No entities)");
+        }
     }
 }

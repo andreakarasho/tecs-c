@@ -51,8 +51,8 @@ public static class AutoRegistrationExample
         // Query with auto-registration
         Console.WriteLine("\nQuerying entities with Position AND Player tag:");
         var query = world.Query()
-            .With<Position>(world)  // Auto-registers Position
-            .With<Player>(world)    // Auto-registers Player tag
+            .With<Position>()  // Auto-registers Position
+            .With<Player>()    // Auto-registers Player tag
             .Iter();
 
         int count = 0;
@@ -73,8 +73,8 @@ public static class AutoRegistrationExample
         // Query enemies
         Console.WriteLine("\nQuerying entities with Position AND Enemy tag:");
         query = world.Query()
-            .With<Position>(world)
-            .With<Enemy>(world)
+            .With<Position>()
+            .With<Enemy>()
             .Iter();
 
         count = 0;

@@ -48,13 +48,13 @@ namespace TinyEcsBindings.Bevy
 #>
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
 <#
         for (int i = 0; i < count; i++)
         {
 #>
-            TFilter<#= i #>.Build(world);
+            TFilter<#= i #>.Build(builder);
 <#
         }
 #>

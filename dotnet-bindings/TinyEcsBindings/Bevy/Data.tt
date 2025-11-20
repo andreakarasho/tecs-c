@@ -11,6 +11,22 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace TinyEcsBindings.Bevy
 {
+    /// <summary>
+    /// Helper struct to track component reference and stride
+    /// </summary>
+    internal ref struct ComponentRefInfo<T> where T : struct
+    {
+        internal Ptr<T> Ref;
+        internal int Stride; // 0 if optional and not present, 1 if present
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ComponentRefInfo(ref T value, int stride)
+        {
+            Ref = new Ptr<T>(ref value);
+            Stride = stride;
+        }
+    }
+
 <#
     const int MaxTypeParams = 8;
 
@@ -33,10 +49,12 @@ namespace TinyEcsBindings.Bevy
         for (int i = 0; i < count; i++)
         {
 #>
-        private Span<T<#= i #>> _column<#= i #>;
+        private ComponentRefInfo<T<#= i #>> _refInfo<#= i #>;
 <#
         }
 #>
+        private RefRO<Entity> _entityRef;
+        private int _entityStride;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Data(QueryIterator iterator)
@@ -45,23 +63,15 @@ namespace TinyEcsBindings.Bevy
             _index = -1;
             _count = -1;
             _entities = default;
-<#
-        for (int i = 0; i < count; i++)
-        {
-#>
-            _column<#= i #> = default;
-<#
-        }
-#>
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
 <#
         for (int i = 0; i < count; i++)
         {
 #>
-            world.Component<T<#= i #>>();
+            builder.With<T<#= i #>>();
 <#
         }
 #>
@@ -82,46 +92,30 @@ namespace TinyEcsBindings.Bevy
         /// Deconstruct into component refs (per-entity access)
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Deconstruct(<#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Ref<T{i}> c{i}")) #>)
+        public readonly void Deconstruct(<#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Ptr<T{i}> c{i}")) #>)
         {
 <#
         for (int i = 0; i < count; i++)
         {
 #>
-            c<#= i #> = new Ref<T<#= i #>>(ref _column<#= i #>[_index]);
+            c<#= i #> = _refInfo<#= i #>.Ref;
 <#
         }
 #>
         }
 
         /// <summary>
-        /// Deconstruct into component spans (chunk access)
+        /// Deconstruct into entity ref and component refs (per-entity access)
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void DeconstructSpans(<#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Span<T{i}> c{i}")) #>)
+        public readonly void Deconstruct(out RefRO<Entity> entity, <#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Ptr<T{i}> c{i}")) #>)
         {
+            entity = _entityRef;
 <#
         for (int i = 0; i < count; i++)
         {
 #>
-            c<#= i #> = _column<#= i #>;
-<#
-        }
-#>
-        }
-
-        /// <summary>
-        /// Deconstruct into entities and component spans
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Deconstruct(out ReadOnlySpan<Entity> entities, <#= string.Join(", ", Enumerable.Range(0, count).Select(i => $"out Span<T{i}> c{i}")) #>)
-        {
-            entities = _entities;
-<#
-        for (int i = 0; i < count; i++)
-        {
-#>
-            c<#= i #> = _column<#= i #>;
+            c<#= i #> = _refInfo<#= i #>.Ref;
 <#
         }
 #>
@@ -142,10 +136,29 @@ namespace TinyEcsBindings.Bevy
         for (int i = 0; i < count; i++)
         {
 #>
-                _column<#= i #> = _iterator.Column<T<#= i #>>();
+                var span<#= i #> = _iterator.Column<T<#= i #>>();
+                _refInfo<#= i #> = span<#= i #>.IsEmpty
+                    ? new ComponentRefInfo<T<#= i #>>(ref Unsafe.NullRef<T<#= i #>>(), 0)
+                    : new ComponentRefInfo<T<#= i #>>(ref span<#= i #>[0], 1);
 <#
         }
 #>
+                _entityStride = _entities.IsEmpty ? 0 : 1;
+                _entityRef = _entities.IsEmpty
+                    ? new RefRO<Entity>(ref Unsafe.NullRef<Entity>())
+                    : new RefRO<Entity>(ref Unsafe.AsRef(in _entities[0]));
+            }
+            else
+            {
+<#
+        for (int i = 0; i < count; i++)
+        {
+#>
+                _refInfo<#= i #>.Ref._value = ref Unsafe.Add(ref _refInfo<#= i #>.Ref._value, _refInfo<#= i #>.Stride);
+<#
+        }
+#>
+                _entityRef._value = ref Unsafe.Add(ref _entityRef._value, _entityStride);
             }
 
             return true;
@@ -153,23 +166,6 @@ namespace TinyEcsBindings.Bevy
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly Data<<#= typeParams #>> GetEnumerator() => this;
-
-        /// <summary>
-        /// Get entity at current index
-        /// </summary>
-        public readonly Entity Entity => _entities[_index];
-
-        /// <summary>
-        /// Get component reference at current index
-        /// </summary>
-<#
-        for (int i = 0; i < count; i++)
-        {
-#>
-        public readonly ref T<#= i #> Item<#= i #> => ref _column<#= i #>[_index];
-<#
-        }
-#>
     }
 
 <#

@@ -1,0 +1,87 @@
+<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".g.cs" #>
+<#
+    const int MaxParams = 8;
+#>
+using System;
+
+namespace TinyEcsBindings.Bevy;
+
+/// <summary>
+/// Extension methods for App that accept Action delegates directly.
+/// Allows: app.AddSystem((Query<Data<Position>> query) => { ... })
+/// </summary>
+public static class AppExtensions
+{
+    /// <summary>
+    /// Add a system with no parameters to the Update stage.
+    /// </summary>
+    public static SystemConfigurator AddSystem(this App app, Action system)
+    {
+        return app.AddSystem(SystemAdapters.Create(system));
+    }
+
+    /// <summary>
+    /// Add a system with no parameters to a specific stage.
+    /// </summary>
+    public static SystemConfigurator AddSystemToStage(this App app, string stageName, Action system)
+    {
+        return app.AddSystemToStage(stageName, SystemAdapters.Create(system));
+    }
+
+<# for (int i = 1; i <= MaxParams; i++) { #>
+<# var typeParams = string.Join(", ", Enumerable.Range(0, i).Select(n => $"T{n}")); #>
+<# var paramConstraints = string.Join("\n        ", Enumerable.Range(0, i).Select(n => $"where T{n} : ISystemParam, new()")); #>
+    /// <summary>
+    /// Add a system with <#= i #> parameter(s) to the Update stage.
+    /// </summary>
+    public static SystemConfigurator AddSystem<<#= typeParams #>>(
+        this App app,
+        Action<<#= typeParams #>> system)
+        <#= paramConstraints #>
+    {
+        return app.AddSystem(SystemAdapters.Create(system));
+    }
+
+    /// <summary>
+    /// Add a system with <#= i #> parameter(s) to a specific stage.
+    /// </summary>
+    public static SystemConfigurator AddSystemToStage<<#= typeParams #>>(
+        this App app,
+        string stageName,
+        Action<<#= typeParams #>> system)
+        <#= paramConstraints #>
+    {
+        return app.AddSystemToStage(stageName, SystemAdapters.Create(system));
+    }
+
+    /// <summary>
+    /// Add a system with <#= i #> parameter(s) to a custom schedule.
+    /// </summary>
+    public static SystemConfigurator AddSystemToSchedule<<#= typeParams #>>(
+        this App app,
+        string scheduleName,
+        string stageName,
+        Action<<#= typeParams #>> system)
+        <#= paramConstraints #>
+    {
+        return app.AddSystemToScheduleInternal(scheduleName, stageName, SystemAdapters.Create(system));
+    }
+
+<# } #>
+    /// <summary>
+    /// Add a system with no parameters to a custom schedule.
+    /// </summary>
+    public static SystemConfigurator AddSystemToSchedule(
+        this App app,
+        string scheduleName,
+        string stageName,
+        Action system)
+    {
+        return app.AddSystemToScheduleInternal(scheduleName, stageName, SystemAdapters.Create(system));
+    }
+}

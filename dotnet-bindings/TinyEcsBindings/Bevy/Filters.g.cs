@@ -24,10 +24,10 @@ namespace TinyEcsBindings.Bevy
             _filter1 = TFilter1.CreateIterator(iterator);
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
-            TFilter0.Build(world);
-            TFilter1.Build(world);
+            TFilter0.Build(builder);
+            TFilter1.Build(builder);
         }
 
         public static And<TFilter0, TFilter1> CreateIterator(QueryIterator iterator)
@@ -78,11 +78,11 @@ namespace TinyEcsBindings.Bevy
             _filter2 = TFilter2.CreateIterator(iterator);
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
-            TFilter0.Build(world);
-            TFilter1.Build(world);
-            TFilter2.Build(world);
+            TFilter0.Build(builder);
+            TFilter1.Build(builder);
+            TFilter2.Build(builder);
         }
 
         public static And<TFilter0, TFilter1, TFilter2> CreateIterator(QueryIterator iterator)
@@ -138,12 +138,12 @@ namespace TinyEcsBindings.Bevy
             _filter3 = TFilter3.CreateIterator(iterator);
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
-            TFilter0.Build(world);
-            TFilter1.Build(world);
-            TFilter2.Build(world);
-            TFilter3.Build(world);
+            TFilter0.Build(builder);
+            TFilter1.Build(builder);
+            TFilter2.Build(builder);
+            TFilter3.Build(builder);
         }
 
         public static And<TFilter0, TFilter1, TFilter2, TFilter3> CreateIterator(QueryIterator iterator)
@@ -204,13 +204,13 @@ namespace TinyEcsBindings.Bevy
             _filter4 = TFilter4.CreateIterator(iterator);
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
-            TFilter0.Build(world);
-            TFilter1.Build(world);
-            TFilter2.Build(world);
-            TFilter3.Build(world);
-            TFilter4.Build(world);
+            TFilter0.Build(builder);
+            TFilter1.Build(builder);
+            TFilter2.Build(builder);
+            TFilter3.Build(builder);
+            TFilter4.Build(builder);
         }
 
         public static And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4> CreateIterator(QueryIterator iterator)
@@ -276,14 +276,14 @@ namespace TinyEcsBindings.Bevy
             _filter5 = TFilter5.CreateIterator(iterator);
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
-            TFilter0.Build(world);
-            TFilter1.Build(world);
-            TFilter2.Build(world);
-            TFilter3.Build(world);
-            TFilter4.Build(world);
-            TFilter5.Build(world);
+            TFilter0.Build(builder);
+            TFilter1.Build(builder);
+            TFilter2.Build(builder);
+            TFilter3.Build(builder);
+            TFilter4.Build(builder);
+            TFilter5.Build(builder);
         }
 
         public static And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4, TFilter5> CreateIterator(QueryIterator iterator)
@@ -354,15 +354,15 @@ namespace TinyEcsBindings.Bevy
             _filter6 = TFilter6.CreateIterator(iterator);
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
-            TFilter0.Build(world);
-            TFilter1.Build(world);
-            TFilter2.Build(world);
-            TFilter3.Build(world);
-            TFilter4.Build(world);
-            TFilter5.Build(world);
-            TFilter6.Build(world);
+            TFilter0.Build(builder);
+            TFilter1.Build(builder);
+            TFilter2.Build(builder);
+            TFilter3.Build(builder);
+            TFilter4.Build(builder);
+            TFilter5.Build(builder);
+            TFilter6.Build(builder);
         }
 
         public static And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4, TFilter5, TFilter6> CreateIterator(QueryIterator iterator)
@@ -438,16 +438,16 @@ namespace TinyEcsBindings.Bevy
             _filter7 = TFilter7.CreateIterator(iterator);
         }
 
-        public static void Build(TinyWorld world)
+        public static void Build(QueryBuilder builder)
         {
-            TFilter0.Build(world);
-            TFilter1.Build(world);
-            TFilter2.Build(world);
-            TFilter3.Build(world);
-            TFilter4.Build(world);
-            TFilter5.Build(world);
-            TFilter6.Build(world);
-            TFilter7.Build(world);
+            TFilter0.Build(builder);
+            TFilter1.Build(builder);
+            TFilter2.Build(builder);
+            TFilter3.Build(builder);
+            TFilter4.Build(builder);
+            TFilter5.Build(builder);
+            TFilter6.Build(builder);
+            TFilter7.Build(builder);
         }
 
         public static And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4, TFilter5, TFilter6, TFilter7> CreateIterator(QueryIterator iterator)

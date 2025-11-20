@@ -23,7 +23,7 @@ public interface IQueryIterator<TData>
 public interface IData<TData> : IQueryIterator<TData>
     where TData : struct, allows ref struct
 {
-    static abstract void Build(TinyWorld world);
+    static abstract void Build(QueryBuilder builder);
     static abstract TData CreateIterator(QueryIterator iterator);
 }
 
@@ -34,7 +34,7 @@ public interface IFilter<TFilter> : IQueryIterator<TFilter>
     where TFilter : struct, allows ref struct
 {
     void SetTicks(ulong lastRun, ulong thisRun);
-    static abstract void Build(TinyWorld world);
+    static abstract void Build(QueryBuilder builder);
     static abstract TFilter CreateIterator(QueryIterator iterator);
 }
 
@@ -54,7 +54,7 @@ public ref struct Empty : IData<Empty>, IFilter<Empty>
         _asFilter = asFilter;
     }
 
-    public static void Build(TinyWorld world) { }
+    public static void Build(QueryBuilder builder) { }
 
     [UnscopedRef]
     public ref Empty Current => ref this;
